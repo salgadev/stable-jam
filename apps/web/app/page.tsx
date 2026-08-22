@@ -16,7 +16,7 @@ import {
   type BuddyMood,
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
-import { playTogether, parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
+import { parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -113,7 +113,6 @@ export default function HomePage() {
   const [usedBpm, setUsedBpm] = useState<number | null>(null);
   const [usedSeconds, setUsedSeconds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [isPlayingTogether, setIsPlayingTogether] = useState(false);
   // Generation backend. API (Stable Audio 3.0 Large) is default when the key is
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
@@ -144,70 +143,49 @@ export default function HomePage() {
     return file.arrayBuffer();
   }
 
-  async function handleMidiFile(f: File | null) {
-    setMidiFile(f);
+  /** Detect whether a take file is MIDI or audio from its name/MIME type. */
+  function isMidiFile(f: File): boolean {
+    return (
+      /\.mid$/i.test(f.name) ||
+      /\.midi$/i.test(f.name) ||
+      f.type === "audio/midi" ||
+      f.type === "audio/x-midi"
+    );
+  }
+
+  /** Handle a single uploaded take (MIDI or audio), auto-detecting the type. */
+  async function handleTakeFile(f: File | null) {
+    // One upload slot for either kind; picking a new file clears the old take.
+    setMidiFile(null);
     setMidiBytes(null);
+    setAudioFile(null);
     if (!f) {
       setStatus("Ready.");
       return;
     }
-    // The MIDI and audio takes are mutually exclusive — picking one clears
-    // the other so joinIn can't accidentally route audio through the MIDI path.
-    setAudioFile(null);
-    const bytes = await fileToArrayBuffer(f);
-    setMidiBytes(bytes);
-    // Soft-default: if the MIDI has GM channel 9 notes, pre-select the
-    // "Drums" input-instrument pad. The user can still override — channel 9
-    // is the standard drum channel, but real takes can mix drums + bass.
-    // parseMidi throws on non-MIDI bytes (see player.test.ts); fall back to
-    // "other" so a corrupt upload doesn't crash the UI.
-    try {
-      if (parseMidi(bytes).some(isPercussion)) {
-        setInputInstrument("drums");
-      } else {
+    if (isMidiFile(f)) {
+      setMidiFile(f);
+      const bytes = await fileToArrayBuffer(f);
+      setMidiBytes(bytes);
+      // Soft-default: if the MIDI has GM channel 9 notes, pre-select the
+      // "Drums" input-instrument pad. parseMidi throws on corrupt bytes; fall
+      // back to "other".
+      try {
+        setInputInstrument(parseMidi(bytes).some(isPercussion) ? "drums" : "other");
+      } catch {
         setInputInstrument("other");
       }
-    } catch {
+      setStatus(
+        `Loaded ${f.name}. Tempo + length detected from it; buddy will match its ${midiDuration(bytes).toFixed(1)}s length.`,
+      );
+    } else {
+      setAudioFile(f);
+      // Audio is heard by the buddy (audio-to-audio). Clear the MIDI-driven
+      // input-instrument default so the user's declaration reflects the audio.
       setInputInstrument("other");
-    }
-    setStatus(
-      `Loaded ${f.name}. Tempo will be detected from it, and the buddy will match its ${midiDuration(bytes).toFixed(1)}s length.`,
-    );
-  }
-
-  function handleAudioFile(f: File | null) {
-    setAudioFile(f);
-    // The MIDI and audio takes are mutually exclusive — picking one clears
-    // the other so joinIn can't accidentally route audio through the MIDI path.
-    if (f) {
-      setMidiFile(null);
-      setMidiBytes(null);
-    }
-    if (!f) {
-      setStatus("Ready.");
-      return;
-    }
-    setStatus(
-      `Loaded ${f.name}. The buddy will respond to its groove (audio-to-audio).`,
-    );
-  }
-
-  /** Play the MIDI take and the generated response together, in tempo. */
-  async function playBoth() {
-    if (!midiBytes || !audioUrl) {
-      setStatus("Load a MIDI take and generate a response first.");
-      return;
-    }
-    setIsPlayingTogether(true);
-    setStatus("Playing your take + the buddy together…");
-    try {
-      const { done } = await playTogether(midiBytes, audioUrl);
-      await done;
-      setStatus("Done — both played together.");
-    } catch (e) {
-      setStatus(`Playback error: ${String(e)}`);
-    } finally {
-      setIsPlayingTogether(false);
+      setStatus(
+        `Loaded ${f.name}. The buddy will respond to its groove (audio-to-audio).`,
+      );
     }
   }
 
@@ -360,8 +338,9 @@ export default function HomePage() {
             Your take is
           </h2>
           <p className="mb-2 text-[11px] text-[#7f829c]">
-            The buddy can&apos;t read your MIDI/audio — declare what you&apos;re
-            playing so it complements (not duplicates) it.
+            For MIDI we can&apos;t read the notes, so tell us what you&apos;re
+            playing — it helps the buddy complement (not duplicate) it. Audio is
+            heard directly (audio-to-audio).
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {INPUT_INSTRUMENTS.map((i) => (
@@ -387,69 +366,51 @@ export default function HomePage() {
             Your take (optional)
           </h2>
           <p className="mb-2 text-[11px] text-[#7f829c]">
-            MIDI sets the tempo; audio makes the buddy respond to your groove.
+            MIDI sets tempo + length; audio makes the buddy respond to your groove.
+            Drop either in the slot below.
           </p>
-          <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-[#7f829c]">
-                MIDI take (controller) — buddy matches its tempo + length
-              </span>
-              <input
-                type="file"
-                accept=".mid,.midi,audio/midi,audio/x-midi"
-                aria-label="Upload a MIDI take from a controller"
-                onChange={(e) => handleMidiFile(e.target.files?.[0] ?? null)}
-                className="block w-full rounded border border-[#2a2d3d] bg-[#12131b] px-3 py-2 text-sm text-[#c9c9d6] file:mr-3 file:rounded file:border-0 file:bg-[#f4a261] file:px-3 file:py-1 file:font-bold file:text-[#12131b]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-[#7f829c]">
-                Audio take (mic/interface) — buddy responds to the groove
-              </span>
-              <input
-                type="file"
-                accept=".wav,.mp3,.aiff,.flac,audio/*"
-                aria-label="Upload an audio take"
-                onChange={(e) => handleAudioFile(e.target.files?.[0] ?? null)}
-                className="block w-full rounded border border-[#2a2d3d] bg-[#12131b] px-3 py-2 text-sm text-[#c9c9d6] file:mr-3 file:rounded file:border-0 file:bg-[#f4a261] file:px-3 file:py-1 file:font-bold file:text-[#12131b]"
-              />
-            </label>
-          </div>
+          <label className="flex flex-col gap-1">
+            <input
+              type="file"
+              accept=".mid,.midi,.wav,.mp3,.aiff,.flac,audio/midi,audio/x-midi,audio/*"
+              aria-label="Upload your take — MIDI or audio"
+              onChange={(e) => handleTakeFile(e.target.files?.[0] ?? null)}
+              className="block w-full rounded border border-[#2a2d3d] bg-[#12131b] px-3 py-2 text-sm text-[#c9c9d6] file:mr-3 file:rounded file:border-0 file:bg-[#f4a261] file:px-3 file:py-1 file:font-bold file:text-[#12131b]"
+            />
+          </label>
           {midiFile && (
             <p className="mt-2 text-xs text-[#7f829c]">
-              {midiFile.name} — tempo + length detected from it.
+              {midiFile.name} — MIDI: tempo + length detected from it.
             </p>
           )}
           {audioFile && (
             <p className="mt-2 text-xs text-[#7f829c]">
-              {audioFile.name} — audio-to-audio; the buddy responds to its groove.
+              {audioFile.name} — audio: buddy responds to its groove (audio-to-audio).
             </p>
           )}
         </section>
 
         {/* Transport */}
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-3">
           <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
             Engine
           </span>
-          <button
-            type="button"
-            onClick={() => setMode("api")}
-            aria-pressed={mode === "api"}
-            className={`jambuddy-pad ${mode === "api" ? "jambuddy-pad--on" : ""}`}
-            title="Stable Audio 3.0 Large — fast, better isolation, 26 credits/gen"
-          >
-            API
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("local")}
-            aria-pressed={mode === "local"}
-            className={`jambuddy-pad ${mode === "local" ? "jambuddy-pad--on" : ""}`}
-            title="Local CPU model — free, supports the negative prompt, slower"
-          >
-            Local
-          </button>
+          <label className="engine-toggle">
+            <input
+              type="checkbox"
+              checked={mode === "api"}
+              onChange={(e) => setMode(e.target.checked ? "api" : "local")}
+            />
+            <span className="engine-toggle__track">
+              <span className="engine-toggle__opt engine-toggle__opt--api">API</span>
+              <span className="engine-toggle__opt engine-toggle__opt--local">Local</span>
+            </span>
+          </label>
+          <span className="font-mono text-[10px] text-[#7f829c]">
+            {mode === "api"
+              ? "Stable Audio 3.0 Large · 26 credits/gen · ~20s"
+              : "Local CPU · free · supports negative prompt · slower"}
+          </span>
         </div>
         <div className="mb-2 flex items-center gap-4">
           <button
@@ -460,19 +421,6 @@ export default function HomePage() {
           >
             {busy ? "PRODUCING…" : "JOIN IN"}
           </button>
-          <button
-            type="button"
-            onClick={playBoth}
-            disabled={!midiBytes || !audioUrl || isPlayingTogether}
-            className="jambuddy-trigger flex-1"
-            style={{
-              background:
-                "linear-gradient(180deg,#5fd38a 0%,#3aa55f 100%)",
-              boxShadow: "0 2px 0 #256b3f",
-            }}
-          >
-            {isPlayingTogether ? "PLAYING…" : "PLAY BOTH"}
-          </button>
           <div className="font-mono text-xs text-[#7f829c]">
             <div className="uppercase tracking-widest">Prompt</div>
             <div className="mt-1 max-w-[16rem] truncate text-[#e8e8f0]">
@@ -481,11 +429,6 @@ export default function HomePage() {
             <div className="mt-1 opacity-60">neg: {negativePrompt}</div>
           </div>
         </div>
-        <p className="mb-6 text-[11px] text-[#7f829c]">
-          {midiFile && audioUrl
-            ? "PLAY BOTH plays your MIDI take and the buddy's response together, in tempo."
-            : "Load a MIDI take and generate a response, then PLAY BOTH to hear them together."}
-        </p>
 
         {/* Status + playback */}
         <section

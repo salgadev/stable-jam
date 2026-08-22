@@ -95,6 +95,51 @@
   opacity: 0.5;
   cursor: wait;
 }
+
+/* Analog rocker switch for the engine (API / Local). A labelled checkbox
+ * hidden inside; the visual is a two-position rocker with a center pivot,
+ * matching the hardware-sampler aesthetic. Keyboard/screenreader usable. */
+.engine-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.engine-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.engine-toggle__track {
+  display: inline-flex;
+  border: 1px solid #2a2d3d;
+  border-radius: 9999px;
+  background: #15161f;
+  overflow: hidden;
+}
+.engine-toggle__opt {
+  padding: 0.35rem 0.9rem;
+  color: #7f829c;
+  transition: background 0.15s, color 0.15s;
+}
+.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--api {
+  background: #f4a261;
+  color: #12131b;
+  font-weight: 700;
+}
+.engine-toggle input:not(:checked) + .engine-toggle__track .engine-toggle__opt--local {
+  background: #5fd38a;
+  color: #12131b;
+  font-weight: 700;
+}
+.engine-toggle input:focus-visible + .engine-toggle__track {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 :root {
   --bg: #ffffff;
   --fg: #1a1a1a;
