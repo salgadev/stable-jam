@@ -90,3 +90,6 @@ The Summoning Aug 2026/
 
 # Jam Buddy generated WAVs (regenerable via the webapp / tools/jam_buddy.py)
 generations/
+
+# SA3 engine — large venv + license-gated weights; regenerable, keep out of git
+stable-audio-3/

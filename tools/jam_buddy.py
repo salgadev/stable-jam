@@ -219,7 +219,6 @@ def main():
         # Audio-to-audio: feed the take to SA3 via init_audio so the buddy
         # actually HEARS the groove and responds rhythmically, not just at the
         # tempo. Duration matches the take.
-        import torchaudio
         waveform, sr = torchaudio.load(args.wav)
         args.duration = waveform.shape[-1] / sr
         init_audio = (sr, waveform)

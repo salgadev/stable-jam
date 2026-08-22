@@ -27,9 +27,8 @@ cd apps/web && pnpm install && npx vitest run      # 31 tests
 cd apps/web && npx tsc --noEmit                     # typecheck
 pnpm dev                                            # local Next.js server -> :3000
 
-# Python pipeline (uses the SA3 venv in the OLD repo, NOT here)
-JAM_BUDDY_PYTHON=/d/CODE/unstable-drums/stable-audio-3/.venv/Scripts/python.exe \
-  python3 tools/jam_buddy.py --midi take.mid --instrument bass --out out.wav
+# Python pipeline (SA3 venv is in THIS repo)
+./stable-audio-3/.venv/Scripts/python.exe tools/jam_buddy.py --midi take.mid --instrument bass --out out.wav
 
 # Conversion CLIs (if needed)
 python gp5_to_keyswitched_mid.py path/to/song.gp5

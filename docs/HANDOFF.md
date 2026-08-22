@@ -61,14 +61,18 @@ clean, product-accurate home.
 
 ## Key environment / paths
 
+SA3 (the engine) now lives IN this repo at `stable-audio-3/`. The venv's
+editable-install `.pth` was repointed to this location (was `D:/CODE/unstable-drums/...`).
+The `/api/jambuddy` route auto-resolves it via `join(repoRoot, "stable-audio-3", ...)`.
+
 | Var | Value |
 |---|---|
 | `JAM_BUDDY_ROOT` | `D:/CODE/stable-jam` (repo root; route walks up to find `tools/jam_buddy.py`) |
-| `JAM_BUDDY_PYTHON` | `D:/CODE/unstable-drums/stable-audio-3/.venv/Scripts/python.exe` (the SA3 venv — NOT in this repo) |
+| `JAM_BUDDY_PYTHON` | `D:/CODE/stable-jam/stable-audio-3/.venv/Scripts/python.exe` (the SA3 venv) |
 | SA3 weights | cached in `stable-audio-3/.venv` + HF cache on G:/AI/models/huggingface |
-| `HF_TOKEN` | in old repo's `.env` (needed for gated SA3 model access) |
+| `HF_TOKEN` | in old repo's `.env` (needed for gated SA3 model access) — copy if regenerating weights |
 
-The SA3 venv was extended this session with `mido` and `librosa`
+The SA3 venv was extended with `mido` and `librosa`
 (`uv pip install --python .../stable-audio-3/.venv/Scripts/python.exe mido librosa`).
 A fresh session must use that venv or recreate it.
 
@@ -85,9 +89,8 @@ cd apps/web && npx vitest run && npx tsc --noEmit
 # 3. dev server
 cd apps/web && pnpm dev   # -> http://localhost:3000
 
-# 4. python pipeline (uses the old repo's SA3 venv)
-JAM_BUDDY_PYTHON=/d/CODE/unstable-drums/stable-audio-3/.venv/Scripts/python.exe \
-  python3 tools/jam_buddy.py --midi take.mid --instrument bass --out out.wav
+# 4. python pipeline (SA3 venv is in THIS repo)
+./stable-audio-3/.venv/Scripts/python.exe tools/jam_buddy.py --midi take.mid --instrument bass --out out.wav
 ```
 
 ## Docs (all in `docs/`)
@@ -103,9 +106,10 @@ JAM_BUDDY_PYTHON=/d/CODE/unstable-drums/stable-audio-3/.venv/Scripts/python.exe 
 
 ## What's deliberately NOT in this repo (and why)
 
-- `stable-audio-3/` (1.9G vendored SA3) and `text2midi/` (2.8G vendored) — they
-  stay in `D:/CODE/unstable-drums/`. `stable-jam` references the SA3 venv via
-  `JAM_BUDDY_PYTHON`. **Don't copy them.**
+- `text2midi/` (2.8G vendored model) — not part of the Jam Buddy product; it
+  stays in the previous working dir if needed.
+- The SA3 weights / `.venv` are inside `stable-audio-3/` here but **gitignored**
+  (large, regenerable, license-gated). See `.gitignore`.
 - `node_modules/`, `.next/` — regenerable, not committed.
 - `generations/*.wav` — gitignored (regenerable output).
 - Source song/GP files + scratch WAVs in the old `tools/` — not product source.
