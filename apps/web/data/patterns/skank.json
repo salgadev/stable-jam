@@ -1,0 +1,20 @@
+{
+  "id": "skank",
+  "name": "Skank Beat",
+  "description": "Skank beat at 120 BPM. Kick on 1 and 3, snare on 2 and 4, hi-hat plays on every upbeat — the 'and' of each beat. Ska upstroke feel.",
+  "tags": ["ska", "punk", "upstrokes", "offbeat"],
+  "genre": "punk",
+  "defaultTempo": 120,
+  "defaultBars": 1,
+  "swingRatio": 0,
+  "hits": [
+    { "position": 0.0,   "limb": "kick",  "velocity": 100 },
+    { "position": 0.5,   "limb": "kick",  "velocity": 100 },
+    { "position": 0.25,  "limb": "snare", "velocity": 100 },
+    { "position": 0.75,  "limb": "snare", "velocity": 100 },
+    { "position": 0.125, "limb": "hihat", "velocity": 80 },
+    { "position": 0.375, "limb": "hihat", "velocity": 80 },
+    { "position": 0.625, "limb": "hihat", "velocity": 80 },
+    { "position": 0.875, "limb": "hihat", "velocity": 80 }
+  ]
+}

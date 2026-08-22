@@ -1,0 +1,29 @@
+{
+  "name": "stable-jam",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jam Buddy — an AI music companion that listens to what you play and joins in, at your tempo, in the instrument you pick. Built for the Stability AI Challenge at Music Hackspace Montreal.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @patterntalk/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:web": "pnpm --filter @patterntalk/web test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r exec rm -rf node_modules dist .next"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

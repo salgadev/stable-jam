@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "skank-beat",
+      "patterns": ["tupatupatupa", "tupa-tupa-tupa", "chka-chka-chka", "tupa tupa tupa"],
+      "patternId": "skank",
+      "defaultCymbal": { "type": "hihat-open", "pattern": "upstrokes" },
+      "confidence": 0.9,
+      "notes": "Ska-style offbeat hi-hat upstrokes. The canonical demo phrase."
+    },
+    {
+      "id": "blast-beat",
+      "patterns": ["krrk-krrk-krrk", "krrk krrk krrk", "BLAM-BLAM-BLAM", "krkrkrkrk"],
+      "patternId": "blast-traditional",
+      "defaultIntensity": "brutal",
+      "confidence": 0.85,
+      "notes": "Traditional blast beat. Kick-snare alternation."
+    },
+    {
+      "id": "boom-bap",
+      "patterns": ["boom-bap", "boom bap", "boom-bap-boom-bap"],
+      "patternId": "hiphop-basic",
+      "confidence": 0.95
+    },
+    {
+      "id": "china-accent",
+      "patterns": ["tss", "chka"],
+      "patternId": "china-accent",
+      "defaultCymbal": { "type": "china", "pattern": "wash" }
+    },
+    {
+      "id": "ride-bell",
+      "patterns": ["ding-ding-ding", "ding ding ding", "ding-ding-ding-ding"],
+      "patternId": "ride-bell-8ths",
+      "defaultCymbal": { "type": "ride", "pattern": "bell" }
+    }
+  ]
+}

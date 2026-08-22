@@ -1,0 +1,28 @@
+{
+  "id": "d-beat",
+  "name": "D-Beat",
+  "description": "D-beat pattern at 180 BPM. Kick plays on every beat with 8th-note doubles, snare hits on 2 and 4, ride bell plays steady 8ths throughout. Common in Discharge, Entombed, and Scandinavian crust punk.",
+  "tags": ["metal", "punk", "discharge", "entombed", "crust", "fast"],
+  "genre": "metal",
+  "defaultTempo": 180,
+  "defaultBars": 1,
+  "swingRatio": 0,
+  "hits": [
+    { "position": 0.0,   "limb": "kick",      "velocity": 110 },
+    { "position": 0.125, "limb": "kick",      "velocity": 80  },
+    { "position": 0.25,  "limb": "snare",     "velocity": 100 },
+    { "position": 0.375, "limb": "kick",      "velocity": 80  },
+    { "position": 0.5,   "limb": "kick",      "velocity": 110 },
+    { "position": 0.625, "limb": "kick",      "velocity": 80  },
+    { "position": 0.75,  "limb": "snare",     "velocity": 100 },
+    { "position": 0.875, "limb": "kick",      "velocity": 80  },
+    { "position": 0.0,   "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.125, "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.25,  "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.375, "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.5,   "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.625, "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.75,  "limb": "ride-bell", "velocity": 70  },
+    { "position": 0.875, "limb": "ride-bell", "velocity": 70  }
+  ]
+}

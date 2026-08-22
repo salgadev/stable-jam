@@ -1,0 +1,511 @@
+songs:
+- source_gp5: Altars rev Yes Breakdown.gp5
+  songs_subdir: Altars rev Yes Breakdown
+  tracks:
+  - name: Distortion Guitar
+    channel: 0
+    include_bass: false
+    midi_path: Altars rev Yes Breakdown/Distortion Guitar (1)_keyswitched.mid
+    conductor:
+      tempo_bpm: 190
+      numerator: 3
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 558720
+    keyswitch_counts:
+      SusUp: 595
+      PalmDown: 964
+      D1(Hammer): 50
+      '38': 168
+      '40': 19
+      '41': 19
+      '43': 7
+      '45': 100
+      '46': 233
+      '48': 173
+      '49': 20
+      '50': 258
+      '51': 2
+      '52': 176
+      '53': 237
+      '55': 196
+      '57': 216
+      '58': 128
+      '60': 56
+      '61': 2
+      '62': 13
+      '64': 59
+      '65': 42
+      '67': 30
+      '69': 30
+  - name: Distortion Guitar
+    channel: 2
+    include_bass: false
+    midi_path: Altars rev Yes Breakdown/Distortion Guitar (2)_keyswitched.mid
+    conductor:
+      tempo_bpm: 190
+      numerator: 3
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 558720
+    keyswitch_counts:
+      SusUp: 366
+      PalmDown: 651
+      D1(Hammer): 16
+      '38': 96
+      '40': 16
+      '41': 16
+      '43': 4
+      '45': 48
+      '46': 157
+      '48': 132
+      '49': 20
+      '50': 187
+      '51': 2
+      '52': 136
+      '53': 165
+      '55': 143
+      '57': 138
+      '58': 70
+      '60': 30
+      '62': 7
+      '64': 18
+      '65': 9
+      '67': 8
+      '69': 8
+  - name: Clean Guitar
+    channel: 4
+    include_bass: false
+    midi_path: Altars rev Yes Breakdown/Clean Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 190
+      numerator: 3
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 63360
+    keyswitch_counts:
+      SusUp: 35
+      '38': 4
+      '40': 2
+      '41': 2
+      '43': 2
+      '45': 12
+      '46': 4
+      '48': 2
+      '50': 14
+      '52': 4
+      '53': 6
+      '57': 16
+      '58': 8
+      '60': 8
+      '62': 4
+      '64': 16
+      '65': 8
+      '67': 4
+      '69': 4
+- source_gp5: Sacrifice ReDrum Full v2 gracenotes.gp5
+  songs_subdir: Sacrifice ReDrum Full v2 gracenotes
+  tracks:
+  - name: Clean Guitar
+    channel: 0
+    include_bass: false
+    midi_path: Sacrifice ReDrum Full v2 gracenotes/Clean Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 140
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 123840
+    keyswitch_counts:
+      SusUp: 225
+      '38': 8
+      '45': 6
+      '46': 10
+      '48': 4
+      '49': 2
+      '50': 22
+      '52': 16
+      '53': 18
+      '55': 8
+      '57': 42
+      '58': 24
+      '60': 8
+      '61': 6
+      '62': 52
+      '64': 8
+      '65': 8
+  - name: Dany Rhythm Guitar
+    channel: 2
+    include_bass: false
+    midi_path: Sacrifice ReDrum Full v2 gracenotes/Dany Rhythm Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 140
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 738240
+    keyswitch_counts:
+      Harm: 2
+      SusUp: 444
+      PalmDown: 1094
+      B0(SlideDown): 30
+      C1(SlideUp): 16
+      D1(Hammer): 150
+      D#1(SlideIn): 49
+      '38': 675
+      '39': 3
+      '40': 166
+      '41': 152
+      '43': 46
+      '44': 17
+      '45': 349
+      '46': 40
+      '47': 27
+      '48': 131
+      '49': 2
+      '50': 120
+      '51': 29
+      '52': 84
+      '53': 120
+      '54': 8
+      '55': 113
+      '56': 19
+      '57': 62
+      '58': 19
+      '59': 2
+      '60': 6
+      '62': 18
+      '63': 2
+      '64': 2
+      '65': 4
+      '66': 1
+      '67': 1
+      '69': 1
+      '70': 1
+      '72': 1
+      '74': 1
+  - name: Roberto Rhythm Guitar
+    channel: 4
+    include_bass: false
+    midi_path: Sacrifice ReDrum Full v2 gracenotes/Roberto Rhythm Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 140
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 738240
+    keyswitch_counts:
+      Harm: 2
+      SusUp: 444
+      PalmDown: 1094
+      B0(SlideDown): 30
+      C1(SlideUp): 16
+      D1(Hammer): 150
+      D#1(SlideIn): 49
+      '38': 675
+      '39': 4
+      '40': 184
+      '41': 171
+      '43': 38
+      '44': 17
+      '45': 341
+      '46': 49
+      '47': 28
+      '48': 149
+      '50': 133
+      '51': 30
+      '52': 109
+      '53': 128
+      '54': 8
+      '55': 71
+      '56': 21
+      '57': 25
+      '58': 11
+      '60': 4
+      '62': 19
+      '63': 3
+      '65': 1
+      '67': 1
+      '69': 1
+      '70': 1
+  - name: Dany Lead Guitar
+    channel: 6
+    include_bass: false
+    midi_path: Sacrifice ReDrum Full v2 gracenotes/Dany Lead Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 140
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 62400
+    keyswitch_counts:
+      SusUp: 73
+      B0(SlideDown): 6
+      C1(SlideUp): 3
+      D1(Hammer): 19
+      D#1(SlideIn): 1
+      '55': 4
+      '57': 4
+      '58': 5
+      '60': 4
+      '62': 8
+      '64': 5
+      '65': 12
+      '67': 9
+      '69': 6
+      '70': 4
+      '72': 5
+      '73': 2
+      '74': 11
+      '76': 9
+      '77': 8
+      '79': 5
+      '81': 1
+      '82': 3
+      '84': 1
+      Bend: 8
+- source_gp5: The Summoning Aug 2026.gp5
+  songs_subdir: The Summoning Aug 2026
+  tracks:
+  - name: Roberto Rhythm Guitar
+    channel: 0
+    include_bass: false
+    midi_path: The Summoning Aug 2026/Roberto Rhythm Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 496320
+    keyswitch_counts:
+      Harm: 2
+      SusUp: 614
+      PalmDown: 365
+      C1(SlideUp): 3
+      D1(Hammer): 54
+      D#1(SlideIn): 16
+      '38': 300
+      '40': 62
+      '41': 61
+      '43': 16
+      '44': 8
+      '45': 133
+      '46': 131
+      '48': 48
+      '49': 9
+      '50': 160
+      '51': 1
+      '52': 115
+      '53': 99
+      '55': 24
+      '56': 1
+      '57': 88
+      '58': 28
+      '61': 4
+      '62': 37
+      '64': 21
+      '65': 5
+      '69': 3
+      '71': 1
+      '73': 2
+      '74': 1
+  - name: DANY Rhythm Guitar
+    channel: 2
+    include_bass: false
+    midi_path: The Summoning Aug 2026/DANY Rhythm Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 496320
+    keyswitch_counts:
+      Harm: 2
+      SusUp: 560
+      PalmDown: 368
+      C1(SlideUp): 2
+      D1(Hammer): 39
+      D#1(SlideIn): 16
+      '38': 284
+      '40': 48
+      '41': 54
+      '43': 28
+      '44': 8
+      '45': 135
+      '46': 121
+      '48': 51
+      '49': 8
+      '50': 141
+      '51': 1
+      '52': 72
+      '53': 80
+      '55': 61
+      '56': 1
+      '57': 101
+      '58': 18
+      '60': 9
+      '61': 5
+      '62': 35
+      '64': 15
+      '65': 9
+      '67': 3
+      '69': 7
+      '70': 2
+      '73': 3
+      '74': 1
+      '76': 3
+      Bend: 1
+  - name: DANY Lead Guitar
+    channel: 8
+    include_bass: false
+    midi_path: The Summoning Aug 2026/DANY Lead Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 335040
+    keyswitch_counts:
+      Harm: 3
+      SusUp: 153
+      PalmDown: 7
+      B0(SlideDown): 3
+      C1(SlideUp): 6
+      D1(Hammer): 110
+      D#1(SlideIn): 3
+      '38': 1
+      '50': 3
+      '53': 8
+      '55': 9
+      '56': 1
+      '57': 14
+      '58': 4
+      '59': 1
+      '60': 10
+      '62': 19
+      '64': 11
+      '65': 20
+      '67': 11
+      '68': 5
+      '69': 23
+      '70': 12
+      '71': 5
+      '72': 21
+      '74': 29
+      '75': 1
+      '76': 18
+      '77': 25
+      '79': 10
+      '80': 5
+      '81': 13
+      '82': 7
+      '83': 2
+      '84': 2
+      '86': 4
+      Bend: 12
+  - name: Roberto Lead Guitar
+    channel: 15
+    include_bass: false
+    midi_path: The Summoning Aug 2026/Roberto Lead Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 139200
+    keyswitch_counts:
+      SusUp: 77
+      PalmDown: 6
+      B0(SlideDown): 1
+      C1(SlideUp): 2
+      D1(Hammer): 42
+      '38': 16
+      '40': 6
+      '41': 14
+      '45': 10
+      '46': 6
+      '50': 14
+      '52': 14
+      '53': 22
+      '55': 2
+      '57': 12
+      '62': 6
+      '64': 2
+      '65': 1
+      '67': 2
+      '69': 4
+      '70': 3
+      '72': 3
+      '74': 4
+      '76': 4
+      Bend: 4
+  - name: William Harmony
+    channel: 11
+    include_bass: false
+    midi_path: The Summoning Aug 2026/William Harmony_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 228480
+    keyswitch_counts:
+      SusUp: 14
+      B0(SlideDown): 1
+      C1(SlideUp): 2
+      D1(Hammer): 3
+      '65': 1
+      '67': 2
+      '69': 4
+      '70': 3
+      '72': 3
+      '74': 4
+      '76': 4
+      '77': 1
+      '79': 2
+      '81': 1
+      Bend: 4
+  - name: Roberto Clean Guitar
+    channel: 4
+    include_bass: false
+    midi_path: The Summoning Aug 2026/Roberto Clean Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 31520
+    keyswitch_counts:
+      SusUp: 65
+      PalmDown: 6
+      D1(Hammer): 40
+      '38': 16
+      '40': 6
+      '41': 14
+      '45': 10
+      '46': 6
+      '50': 14
+      '52': 14
+      '53': 22
+      '55': 2
+      '57': 12
+      '62': 6
+      '64': 2
+  - name: William Clean Guitar
+    channel: 6
+    include_bass: false
+    midi_path: The Summoning Aug 2026/William Clean Guitar_keyswitched.mid
+    conductor:
+      tempo_bpm: 130
+      numerator: 4
+      denominator: 4
+    first_event_tick: 0
+    last_event_tick: 4640
+    keyswitch_counts:
+      SusUp: 5
+      PalmDown: 2
+      D1(Hammer): 10
+      '53': 4
+      '55': 5
+      '57': 8
+      '58': 1

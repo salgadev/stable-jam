@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Jam Buddy hardware-sampler rack.
+ * Self-contained dark panel with a rotary-knob look and trigger pads.
+ * Kept as plain CSS so it doesn't fight the Tailwind theme tokens, and
+ * accessibility is preserved (range inputs, focus rings, aria-live).
+ */
+.jambuddy-rack {
+  background: linear-gradient(180deg, #1c1e2b 0%, #12131b 100%);
+  border: 1px solid #2a2d3d;
+}
+
+.jambuddy-pad {
+  border-radius: 0.5rem;
+  border: 1px solid #2a2d3d;
+  background: #1f2130;
+  color: #7f829c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.6rem 0;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.jambuddy-pad:hover {
+  background: #2a2d3d;
+}
+.jambuddy-pad--on {
+  background: #f4a261;
+  color: #12131b;
+  box-shadow: 0 0 12px rgba(244, 162, 97, 0.4);
+  font-weight: bold;
+}
+
+/* Rotary knob = a styled <input type=range>. The dial arc is drawn with a
+ * conic gradient sized by the --knob-pct custom property. */
+.jambuddy-knob {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 50% 50%, #2c2f42 0%, #1a1c28 70%),
+    conic-gradient(
+      #f4a261 0deg,
+      #f4a261 calc(var(--knob-pct) * 3.6deg),
+      #34384b calc(var(--knob-pct) * 3.6deg),
+      #34384b 360deg
+    );
+  border: 2px solid #3a3e52;
+  cursor: pointer;
+  position: relative;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.jambuddy-knob::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: #f0ede6;
+  border: 1px solid #000;
+  transform: translateY(-6px);
+}
+.jambuddy-knob::-moz-range-thumb {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: #f0ede6;
+  border: 1px solid #000;
+}
+
+/* The big trigger button */
+.jambuddy-trigger {
+  border-radius: 0.5rem;
+  border: none;
+  background: linear-gradient(180deg, #f4a261 0%, #e07b3a 100%);
+  color: #12131b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.9rem 0;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #a85a24;
+}
+.jambuddy-trigger:hover {
+  filter: brightness(1.05);
+}
+.jambuddy-trigger:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --accent: #0066cc;
+  --focus: #ffd700;
+  --limb-kick: #d62828;
+  --limb-snare: #1d3557;
+  --limb-hihat: #f4a261;
+  --limb-ride: #2a9d8f;
+  --limb-crash: #e76f51;
+  --limb-china: #8338ec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --fg: #f0f0f0;
+    --accent: #66b2ff;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --fg: #000000;
+    --bg: #ffffff;
+    --accent: #0000ee;
+    --focus: #ff00ff;
+  }
+}
+
+/* Always-visible focus outline — WCAG 2.4.7 */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Skip links — pattern from docs/05-accessibility.md §Keyboard navigation */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent);
+  color: var(--bg);
+  padding: 0.5rem 1rem;
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Reduced motion — docs/05-accessibility.md §Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

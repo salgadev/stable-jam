@@ -1,0 +1,92 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Audio service
+services/audio/models/
+services/audio/loras/
+services/audio/cache/
+services/audio/__pycache__/
+
+# Training data (large, keep manifest only)
+data/training/*.wav
+data/training/*.mp3
+data/training/*.flac
+
+# openlore
+.openlore/
+.openlore/analysis/
+.openlore/serve.log
+.openlore/serve.pid
+
+# OS
+Thumbs.db
+
+# text2midi (cloned model repo, not part of this project)
+text2midi/
+
+# Scratch + source song data (user's GP files, not in git per conftest)
+# Source song folders / individual song files
+gp5_songs/
+*.gp
+*.gp5
+
+# Conversion-corpus fixtures (GP files stay out of git; only baseline.yaml is tracked)
+tests/fixtures/
+
+# Event-trace scratch dumps
+fallen_events.json
+summoning_js_events.json
+
+# Generated keyswitched MIDI output (regenerable via gp5_to_keyswitched_mid.py)
+# Per-track output lands in song-named dirs at repo root (e.g. "Altars rev Yes Breakdown/")
+Altars rev Yes Breakdown/
+Sacrifice ReDrum Full v2 gracenotes/
+The Summoning Aug 2026/
+*.keyswitched.mid
+
+# Jam Buddy generated WAVs (regenerable via the webapp / tools/jam_buddy.py)
+generations/
