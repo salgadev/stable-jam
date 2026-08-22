@@ -141,6 +141,10 @@ export async function POST(req: NextRequest) {
       const audioPath = join(tmpdir(), `jambuddy-take-${Date.now()}.wav`);
       await writeFile(audioPath, Buffer.from(body.audio, "base64"));
       args.push("--wav", audioPath);
+      // Forward the genre so the audio-BPM detector uses its tempo prior
+      // (e.g. punk 140-220) instead of the weak "any" default — which is what
+      // made it resolve the drums at 120 instead of 158.
+      args.push("--genre", body.knobs.genre);
       console.log("[jambuddy] audio take: audio-to-audio (responds to groove)");
     } else {
       args.push("--bpm", String(bpm), "--duration", String(duration));

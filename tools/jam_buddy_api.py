@@ -213,7 +213,13 @@ def main():
         print(f"Detected BPM (MIDI): {bpm} | duration {args.duration:.1f}s")
     elif args.wav:
         bpm, sr = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
-        print(f"Detected BPM (audio): {bpm:.1f}")
+        print(f"Detected BPM (audio): {bpm:.1f} (genre={args.genre})")
+        # Duration must match the take's actual length (like the MIDI path) so
+        # the response stays in tempo with it. Read the real file length.
+        import soundfile as sf
+        info = sf.info(args.wav)
+        args.duration = max(6.0, float(info.frames) / info.samplerate)
+        print(f"  audio length -> response {args.duration:.1f}s")
         init_audio = open(args.wav, "rb")
     else:
         ap.error("one of --midi, --wav, or --bpm is required")
