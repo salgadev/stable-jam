@@ -22,6 +22,8 @@ export interface ParsedNote {
   midi: number;
   duration: number;
   velocity: number;
+  /** GM channel 0-15; 9 = percussion. Used to route drums to a click. */
+  channel: number;
 }
 
 /** Parse a MIDI file's bytes into playable notes (+ duration). */
@@ -29,17 +31,29 @@ export function parseMidi(bytes: ArrayBuffer): ParsedNote[] {
   const midi = new Midi(bytes);
   const notes: ParsedNote[] = [];
   for (const track of midi.tracks) {
+    // tonejs exposes the channel on the Track (a plain number), not each Note.
+    const channel = track.channel ?? 0;
     for (const note of track.notes) {
       notes.push({
         time: note.time,
         midi: note.midi,
         duration: note.duration,
         velocity: note.velocity,
+        channel,
       });
     }
   }
   notes.sort((a, b) => a.time - b.time);
   return notes;
+}
+
+/**
+ * Is this a percussion note (GM channel 9)? Drums render as a percussive
+ * click/noise burst so they're audible alongside the produced WAV, instead
+ * of a low thin oscillator that gets buried.
+ */
+export function isPercussion(note: ParsedNote): boolean {
+  return note.channel === 9;
 }
 
 /** midi note -> frequency in Hz. */
@@ -48,8 +62,9 @@ export function midiToFreq(n: number): number {
 }
 
 /**
- * Schedule a MIDI note as a short pitched oscillator through a gain envelope.
- * Drums (channel-10 style, low/high notes) get a percussive click instead.
+ * Schedule a MIDI note as an audible source through a gain envelope.
+ * Percussion (GM channel 9) renders as a short noise-burst click so drum hits
+ * cut through the produced WAV; pitched notes render as a short oscillator.
  */
 function scheduleNote(
   ctx: AudioContext,
@@ -57,15 +72,36 @@ function scheduleNote(
   dest: AudioNode,
   when: number,
 ) {
-  const osc = ctx.createOscillator();
   const gain = ctx.createGain();
+  const dur = Math.max(0.05, note.duration);
+  const vel = Math.max(0.2, note.velocity); // floor so quiet notes stay audible
 
+  if (isPercussion(note)) {
+    // Short noise burst (kick/snare-ish) so drum hits are clearly heard.
+    const len = Math.max(0.05, Math.min(0.15, dur));
+    const buf = ctx.createBuffer(1, Math.ceil(len * ctx.sampleRate), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-(i / data.length) * 6);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(vel * 0.7, when + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + len);
+    src.connect(gain);
+    gain.connect(dest);
+    src.start(when);
+    src.stop(when + len + 0.02);
+    return;
+  }
+
+  const osc = ctx.createOscillator();
   osc.type = "triangle";
   osc.frequency.value = midiToFreq(note.midi);
 
-  const dur = Math.max(0.05, note.duration);
   gain.gain.setValueAtTime(0, when);
-  gain.gain.linearRampToValueAtTime(note.velocity * 0.5, when + 0.01);
+  gain.gain.linearRampToValueAtTime(vel * 0.5, when + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 
   osc.connect(gain);

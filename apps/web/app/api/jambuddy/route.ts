@@ -18,6 +18,8 @@ interface JambuddyBody {
   audio?: string;
   /** Response length in seconds. Default 30 (ignored when a take is provided). */
   duration?: number;
+  /** Generation backend: "local" (CPU SA3) or "api" (Stable Audio 3.0 Large, 26 credits/gen). */
+  mode?: "local" | "api";
 }
 
 /**
@@ -75,10 +77,24 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+  // Thread the TS-built AudioSparx prompt through so Genre:/Moods:/Instruments
+  // tags actually reach SA3. The Python CLI also accepts --instrument/--genre
+  // for standalone use, but route.ts is authoritative here.
   const python =
     process.env.JAM_BUDDY_PYTHON ??
     join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe");
-  const script = join(repoRoot, "tools", "jam_buddy.py");
+
+  // Local = Stable Audio small models on CPU (supports negative prompt, free,
+  // slow). API = Stable Audio 3.0 Large via Stability REST (no negative prompt,
+  // fast, 26 credits/gen). Default to API — key is present, it's faster and
+  // isolates better; the user can flip to local (offline / free) in the GUI.
+  const mode: "local" | "api" =
+    body.mode === "local" ? "local" : "api";
+  const script = join(
+    repoRoot,
+    "tools",
+    mode === "api" ? "jam_buddy_api.py" : "jam_buddy.py",
+  );
 
   // Always write to a PERSISTENT generations dir at the repo root so the
   // output survives and is inspectable. Filenames are timestamped + tagged so
@@ -87,15 +103,33 @@ export async function POST(req: NextRequest) {
   await mkdir(generationsDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const sourceTag = body.midi ? "midi" : body.audio ? "audio" : "manual";
+  // API returns MP3 (output_format mp3); local returns WAV.
+  const ext = mode === "api" ? "mp3" : "wav";
   const outPath = join(
     generationsDir,
-    `${stamp}-${body.knobs.instrument}-${sourceTag}.wav`,
+    `${stamp}-${body.knobs.instrument}-${sourceTag}-${mode}.${ext}`,
   );
 
   try {
     // Build args. A take (MIDI or audio) makes the buddy respond to it; with
-    // neither we use the manual bpm knob + duration.
-    const args = ["--model", model, "--out", outPath];
+    // neither we use the manual bpm knob + duration. The TS-built prompt and
+    // negative prompt override the Python auto-build so AudioSparx tags
+    // (Genre:/Moods:/Instruments:) actually reach SA3.
+
+    const args = [
+      "--instrument",
+      body.knobs.instrument,
+      "--prompt",
+      prompt,
+      "--out",
+      outPath,
+    ];
+    // Local model + negative prompt are CPU-only concepts. The API fixes the
+    // model (stable-audio-3) and accepts NO negative prompt.
+    if (mode === "local") {
+      args.unshift("--model", model);
+      args.push("--negative-prompt", negativePrompt);
+    }
     if (body.midi) {
       // MIDI: derive tempo + response duration from the take (server mido).
       const midiPath = join(tmpdir(), `jambuddy-take-${Date.now()}.mid`);
@@ -112,11 +146,39 @@ export async function POST(req: NextRequest) {
       args.push("--bpm", String(bpm), "--duration", String(duration));
     }
 
+    const t0 = Date.now();
+    // The Python child needs STABILITY_API_KEY in its env for API mode. Read it
+    // from the repo-root .env (the child's cwd is apps/web, so it can't find it
+    // itself) and pass it explicitly. Local mode ignores it.
+    let childEnv = process.env;
+    if (mode === "api") {
+      const dotenvPath = join(repoRoot, ".env");
+      let apiKey = process.env.STABILITY_API_KEY ?? null;
+      if (!apiKey) {
+        try {
+          const dotenvText = await readFile(dotenvPath, "utf8");
+          const m = dotenvText.match(/^STABILITY_API_KEY=(.+)$/m);
+          const val = m?.[1];
+          if (val) apiKey = val.trim().replace(/^["']|["']$/g, "");
+        } catch {
+          /* .env missing — the child will error clearly */
+        }
+      }
+      if (!apiKey) {
+        throw new Error(
+          "STABILITY_API_KEY not found in repo .env or process env (required for api mode)",
+        );
+      }
+      childEnv = { ...process.env, STABILITY_API_KEY: apiKey };
+    }
     const { stdout } = await execFileAsync(python, [script, ...args], {
       timeout: 300_000, // 5 min — SA3 generation on CPU is slow
       maxBuffer: 10 * 1024 * 1024,
+      env: childEnv,
     });
+    const generateMs = Date.now() - t0;
     console.log("[jambuddy] stdout:", stdout);
+    console.log("[jambuddy] generate time:", generateMs, "ms");
 
     // The script prints the tempo it used, e.g.
     //   "Detected BPM (MIDI): 117 from ..."  (with a take)
@@ -130,11 +192,15 @@ export async function POST(req: NextRequest) {
     console.log("[jambuddy] used BPM:", usedBpm);
 
     const wav = await readFile(outPath);
+    // API returns MP3, local returns WAV — serve the right content-type.
+    const contentType = mode === "api" ? "audio/mpeg" : "audio/wav";
+    const filename = mode === "api" ? "buddy_response.mp3" : "buddy_response.wav";
     return new NextResponse(wav, {
       headers: {
-        "Content-Type": "audio/wav",
-        "Content-Disposition": 'attachment; filename="buddy_response.wav"',
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "X-Jam-Buddy-BPM": String(usedBpm),
+        "X-Jam-Buddy-Time": String(generateMs),
       },
     });
   } catch (err) {

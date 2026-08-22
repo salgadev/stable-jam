@@ -33,6 +33,7 @@ Usage:
       --wav take.wav --genre metal --instrument bass --out buddy_bass.wav
 """
 import argparse
+import re
 
 import numpy as np
 import torchaudio
@@ -40,13 +41,16 @@ import torchaudio
 # stable_audio_3 is imported lazily inside main() so the BPM-detection half
 # can run standalone without the SA3 venv / model load.
 
-# Instrument -> prompt fragment (the "knob" options)
+# Instrument -> AudioSparx `Instruments:` tag fragment (the "knob" options)
 INSTRUMENTS = {
-    "bass": "a grooving bass guitar line, tight and in the pocket",
-    "lead": "a soaring lead guitar riff, melodic and expressive",
-    "rhythm": "a chugging rhythm guitar, tight palm-muted power chords",
-    "synth": "a warm synth pad, atmospheric and sustained",
-    "drums": "a punchy drum groove, kick and snare locked in",
+    "bass": "Bass Guitar, a grooving bass line, tight and in the pocket",
+    "lead": "Lead Guitar, a soaring melodic lead guitar riff",
+    "rhythm": "Rhythm Guitar, tight palm-muted power chords",
+    "synth": "Synth, a warm atmospheric pad",
+    "drums": "Drums, a punchy drum groove, kick and snare locked in",
+    "sax": "Saxophone, a warm breathy saxophone line with a rich tone",
+    "cleanguitar": "Clean Guitar, bright chimey clean electric guitar arpeggios",
+    "overdrivenguitar": "Overdriven Guitar, a gritty overdriven guitar riff with crunch",
 }
 
 # Genre tempo-range prior (BPM) to disambiguate the octave-drop on AUDIO.
@@ -197,6 +201,10 @@ def main():
     ap.add_argument("--tempo-max", type=float, default=None)
     ap.add_argument("--bpm", type=float, default=None,
                     help="explicit BPM override (skip detection)")
+    ap.add_argument("--prompt", type=str, default=None,
+                    help="full SA3 prompt (overrides --instrument auto-build)")
+    ap.add_argument("--negative-prompt", type=str, default=None,
+                    help="full negative prompt (overrides default)")
     ap.add_argument("--noise", type=float, default=0.4,
                     help="init_noise_level for audio-to-audio (lower = closer to input timing)")
     args = ap.parse_args()
@@ -227,9 +235,36 @@ def main():
         ap.error("one of --midi, --wav, or --bpm is required")
 
     # 2. Generate the response at that BPM
-    prompt = (f"{INSTRUMENTS[args.instrument]}, "
-              f"{int(round(bpm))} BPM, studio recording")
-    negative = "field recording"
+    # AudioSparx vocab: the documented music prefix + Instruments: tag.
+    # If the route passed --prompt / --negative-prompt, those override the
+    # Python auto-build so the full Genre:/Moods:/Instruments: tag set
+    # actually reaches SA3 (the TS buildPrompt is authoritative for the web
+    # path; the Python auto-build is the standalone-CLI fallback).
+    # CRITICAL: when a take is present, the route's --prompt was built with
+    # the KNOB bpm (e.g. 120 default), but the actual bpm is detected here
+    # (e.g. 158). Rewrite the BPM in the prompt so the text label matches
+    # what SA3 will actually generate. SA3 only weakly follows BPM, but a
+    # mismatch is strictly worse than no hint.
+    if args.prompt:
+        prompt = re.sub(r"\b\d+\s*BPM\b", f"{int(round(bpm))} BPM", args.prompt)
+    else:
+        prompt = (f"TrackType: Music, VocalType: Instrumental, "
+                  f"Instruments: {INSTRUMENTS[args.instrument]}, "
+                  f"{int(round(bpm))} BPM, studio recording")
+    # Negative prompt: drop "percussion" when the buddy IS drums (the word
+    # would steer SA3 away from exactly what we want). The Python auto-build
+    # is the drums case; for the web route, --negative-prompt comes from
+    # buildPrompt which has the same bug — fix it here too.
+    if args.negative_prompt:
+        negative = args.negative_prompt
+        if args.instrument == "drums":
+            negative = re.sub(r",\s*percussion", "", negative)
+    else:
+        negative_base = ("other instruments, full band, mixed ensemble, vocals, "
+                         "singing, chords, crowd, noise, field recording")
+        if args.instrument != "drums":
+            negative_base += ", percussion"
+        negative = negative_base
     print(f"  instrument={args.instrument} | prompt: {prompt!r}")
     print(f"  negative: {negative!r}")
 

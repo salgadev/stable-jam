@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { midiToFreq, parseMidi } from "@/lib/jambuddy/player";
+import { midiToFreq, parseMidi, isPercussion, type ParsedNote } from "@/lib/jambuddy/player";
 
 describe("midiToFreq", () => {
   it("maps A4 (69) to 440 Hz", () => {
@@ -16,5 +16,28 @@ describe("midiToFreq", () => {
 describe("parseMidi", () => {
   it("throws a readable error for non-MIDI bytes", () => {
     expect(() => parseMidi(new Uint8Array([1, 2, 3]).buffer)).toThrow();
+  });
+});
+
+describe("isPercussion", () => {
+  it("flags GM channel 9 as percussion", () => {
+    const drum: ParsedNote = {
+      time: 0,
+      midi: 36,
+      duration: 0.1,
+      velocity: 0.9,
+      channel: 9,
+    };
+    expect(isPercussion(drum)).toBe(true);
+  });
+  it("does not flag a normal channel", () => {
+    const bass: ParsedNote = {
+      time: 0,
+      midi: 40,
+      duration: 0.2,
+      velocity: 0.8,
+      channel: 0,
+    };
+    expect(isPercussion(bass)).toBe(false);
   });
 });

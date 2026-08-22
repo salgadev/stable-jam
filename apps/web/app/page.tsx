@@ -3,14 +3,20 @@
 import { useState } from "react";
 import {
   buildPrompt,
+  GENRE_LABELS,
   GENRES,
+  INPUT_INSTRUMENTS,
+  INPUT_INSTRUMENT_LABELS,
   INSTRUMENTS,
+  INSTRUMENT_LABELS,
+  MOOD_LABELS,
   MOODS,
   type BuddyGenre,
   type BuddyInstrument,
   type BuddyMood,
+  type InputInstrument,
 } from "@/lib/jambuddy/prompt";
-import { playTogether, midiDuration } from "@/lib/jambuddy/player";
+import { playTogether, parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -95,6 +101,7 @@ function Pad({
 
 export default function HomePage() {
   const [instrument, setInstrument] = useState<BuddyInstrument>("bass");
+  const [inputInstrument, setInputInstrument] = useState<InputInstrument>("other");
   const [genre, setGenre] = useState<BuddyGenre>("metal");
   const [mood, setMood] = useState<BuddyMood>("energetic");
   const [bpm, setBpm] = useState(184);
@@ -104,11 +111,17 @@ export default function HomePage() {
   const [status, setStatus] = useState<string>("Ready.");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [usedBpm, setUsedBpm] = useState<number | null>(null);
+  const [usedSeconds, setUsedSeconds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [isPlayingTogether, setIsPlayingTogether] = useState(false);
+  // Generation backend. API (Stable Audio 3.0 Large) is default when the key is
+  // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
+  // free, supports the negative prompt, slower.
+  const [mode, setMode] = useState<"api" | "local">("api");
 
   const { prompt, negativePrompt } = buildPrompt({
     instrument,
+    inputInstrument,
     genre,
     mood,
     bpm,
@@ -138,8 +151,25 @@ export default function HomePage() {
       setStatus("Ready.");
       return;
     }
+    // The MIDI and audio takes are mutually exclusive — picking one clears
+    // the other so joinIn can't accidentally route audio through the MIDI path.
+    setAudioFile(null);
     const bytes = await fileToArrayBuffer(f);
     setMidiBytes(bytes);
+    // Soft-default: if the MIDI has GM channel 9 notes, pre-select the
+    // "Drums" input-instrument pad. The user can still override — channel 9
+    // is the standard drum channel, but real takes can mix drums + bass.
+    // parseMidi throws on non-MIDI bytes (see player.test.ts); fall back to
+    // "other" so a corrupt upload doesn't crash the UI.
+    try {
+      if (parseMidi(bytes).some(isPercussion)) {
+        setInputInstrument("drums");
+      } else {
+        setInputInstrument("other");
+      }
+    } catch {
+      setInputInstrument("other");
+    }
     setStatus(
       `Loaded ${f.name}. Tempo will be detected from it, and the buddy will match its ${midiDuration(bytes).toFixed(1)}s length.`,
     );
@@ -147,6 +177,12 @@ export default function HomePage() {
 
   function handleAudioFile(f: File | null) {
     setAudioFile(f);
+    // The MIDI and audio takes are mutually exclusive — picking one clears
+    // the other so joinIn can't accidentally route audio through the MIDI path.
+    if (f) {
+      setMidiFile(null);
+      setMidiBytes(null);
+    }
     if (!f) {
       setStatus("Ready.");
       return;
@@ -177,13 +213,19 @@ export default function HomePage() {
 
   async function joinIn() {
     setBusy(true);
-    setStatus("Producing… this can take a minute on CPU.");
+    setStatus(
+      mode === "api"
+        ? "Producing… (Stable Audio API, ~20s)."
+        : "Producing… this can take a minute on CPU.",
+    );
     setAudioUrl(null);
     setUsedBpm(null);
+    setUsedSeconds(null);
     try {
       const payload: {
         knobs: {
           instrument: BuddyInstrument;
+          inputInstrument: InputInstrument;
           genre: BuddyGenre;
           mood: BuddyMood;
           bpm: number;
@@ -192,7 +234,8 @@ export default function HomePage() {
         midi?: string;
         audio?: string;
         duration?: number;
-      } = { knobs: { instrument, genre, mood, bpm } };
+        mode: "api" | "local";
+      } = { knobs: { instrument, inputInstrument, genre, mood, bpm }, mode };
 
       if (midiFile) {
         setStatus("Reading your MIDI take…");
@@ -220,9 +263,11 @@ export default function HomePage() {
         setStatus(`Production failed: ${err?.detail ?? err?.error ?? res.status}`);
         return;
       }
-      // The route returns the tempo it locked onto in the X-Jam-Buddy-BPM header.
+      // The route returns the tempo it locked onto + the wall-clock generate time.
       const headerBpm = res.headers.get("X-Jam-Buddy-BPM");
       if (headerBpm) setUsedBpm(Math.round(Number(headerBpm)));
+      const headerTime = res.headers.get("X-Jam-Buddy-Time");
+      if (headerTime) setUsedSeconds(Number(headerTime) / 1000);
       const blob = await res.blob();
       setAudioUrl(URL.createObjectURL(blob));
       setStatus("Done — your buddy produced a response.");
@@ -260,11 +305,11 @@ export default function HomePage() {
           >
             Instrument
           </h2>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
             {INSTRUMENTS.map((inst) => (
               <Pad
                 key={inst}
-                label={inst}
+                label={INSTRUMENT_LABELS[inst]}
                 selected={instrument === inst}
                 onSelect={() => setInstrument(inst)}
               />
@@ -283,7 +328,7 @@ export default function HomePage() {
             min={0}
             max={GENRES.length - 1}
             onChange={(v) => setGenre(GENRES[v] ?? "metal")}
-            format={(v) => GENRES[v] ?? ""}
+            format={(v) => GENRE_LABELS[GENRES[v] ?? "metal"] ?? ""}
           />
           <Knob
             label="Mood"
@@ -291,7 +336,7 @@ export default function HomePage() {
             min={0}
             max={MOODS.length - 1}
             onChange={(v) => setMood(MOODS[v] ?? "energetic")}
-            format={(v) => MOODS[v] ?? ""}
+            format={(v) => MOOD_LABELS[MOODS[v] ?? "energetic"] ?? ""}
           />
           <Knob
             label="Tempo"
@@ -303,6 +348,31 @@ export default function HomePage() {
             format={(v) => `${v} BPM`}
             disabled={midiFile !== null || audioFile !== null}
           />
+        </section>
+
+        {/* Your-take-is knob — declares what instrument the user is playing
+            so the buddy can complement it (no MIR on input). */}
+        <section
+          aria-label="Your take"
+          className="mb-6 rounded bg-[#1f2130] p-4"
+        >
+          <h2 className="mb-2 font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+            Your take is
+          </h2>
+          <p className="mb-2 text-[11px] text-[#7f829c]">
+            The buddy can&apos;t read your MIDI/audio — declare what you&apos;re
+            playing so it complements (not duplicates) it.
+          </p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {INPUT_INSTRUMENTS.map((i) => (
+              <Pad
+                key={i}
+                label={INPUT_INSTRUMENT_LABELS[i]}
+                selected={inputInstrument === i}
+                onSelect={() => setInputInstrument(i)}
+              />
+            ))}
+          </div>
         </section>
 
         {/* Take input — MIDI or audio */}
@@ -358,6 +428,29 @@ export default function HomePage() {
         </section>
 
         {/* Transport */}
+        <div className="mb-3 flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+            Engine
+          </span>
+          <button
+            type="button"
+            onClick={() => setMode("api")}
+            aria-pressed={mode === "api"}
+            className={`jambuddy-pad ${mode === "api" ? "jambuddy-pad--on" : ""}`}
+            title="Stable Audio 3.0 Large — fast, better isolation, 26 credits/gen"
+          >
+            API
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("local")}
+            aria-pressed={mode === "local"}
+            className={`jambuddy-pad ${mode === "local" ? "jambuddy-pad--on" : ""}`}
+            title="Local CPU model — free, supports the negative prompt, slower"
+          >
+            Local
+          </button>
+        </div>
         <div className="mb-2 flex items-center gap-4">
           <button
             type="button"
@@ -412,6 +505,11 @@ export default function HomePage() {
           {usedBpm !== null && (
             <p className="mt-2 font-mono text-sm font-bold text-[#f4a261]">
               Buddy tempo: {usedBpm} BPM
+            </p>
+          )}
+          {usedSeconds !== null && (
+            <p className="mt-1 font-mono text-xs text-[#7f829c]">
+              Generated in {usedSeconds.toFixed(1)}s
             </p>
           )}
           {audioUrl && (
