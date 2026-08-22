@@ -1,68 +1,56 @@
-# PatternTalk — Agent Harness
+# stable-jam — Agent Harness
 
-Voice-first, screenreader-compatible AI drum machine for the **Music Hackspace
-Montreal** hackathon (Aug 22–23, 2026, Stability AI challenge). This is the
-working harness: the GP5↔MIDI conversion pipeline that turns band Guitar Pro
-files into Sforzando keyswitched MIDI, plus the Next.js pattern web app.
+**Jam Buddy** — "you start playing, it joins in." An AI music companion for the
+**Music Hackspace Montreal** hackathon (Aug 22–23, 2026, Stability AI challenge).
+A Next.js web rack + a Python SA3 pipeline that listens to a MIDI or audio take
+and responds at your tempo in the instrument you pick.
 
 ## Roles
 
-- **Web app** — `apps/web/` (Next.js + TS + Tailwind + Vitest). Pattern engine,
-  voice conversation, onomatopoeia → MIDI.
-- **GP5 → keyswitched MIDI** — `gp5_to_keyswitched_mid.py` (Python). Reads a
-  `.gp5`, detects articulations (palm mute, staccato, harmonics…), emits a
-  keyswitched MIDI per track for Sforzando.
-- **MIDI → GP5 (reverse)** — `midi_to_gp5.py` (Python). Inverse: infers
-  technique from the keyswitch note preceding each pitched note. Mirror of the
-  forward script; see `MIDI_TO_GP5.md`.
-- **Event trace** — `midjson_to_mid.py` / `gp_to_keyswitched_mid.js` produce
-  `fallen_events.json`, `summoning_js_events.json` event traces for debugging.
-- **Vendored model repo** — `text2midi/` (2.8 GB clone, NOT part of this
-  project). If you need it, it's a separate git repo with its own `.venv`.
+- **Web app** — `apps/web/` (Next.js + TS + Tailwind + Vitest). The hardware
+  sampler rack: instrument pads, genre/mood/tempo knobs, MIDI/audio take input,
+  JOIN IN + PLAY BOTH, status panel, and `generations/` output.
+- **SA3 pipeline** — `tools/jam_buddy.py` (Python). Detects tempo + duration
+  from a MIDI take (or runs audio-to-audio from a WAV), builds the SA3 prompt
+  from the knobs, generates the response WAV via the `stable-audio-3` venv.
+- **Prompt builder** — `apps/web/lib/jambuddy/prompt.ts` (pure, tested).
+- **Player** — `apps/web/lib/jambuddy/player.ts` (Web Audio; play take + buddy
+  together). Note: PLAY BOTH is banked / not fully debugged.
+- **Legacy converters** — `gp5_to_keyswitched_mid.py` / `midi_to_gp5.py` /
+  `midjson_to_mid.py` (GP5↔MIDI tooling from the earlier iteration, still present).
 
 ## Commands
 
 ```bash
-# Python conversion harness (140 tests) — unset PYTHONPATH/VIRTUAL_ENV/SSL_CERT_FILE first
-python -m pytest tests/ -q                  # 140 tests against tests/expected/baseline.yaml
-python tests/record_expected.py             # regenerate baseline.yaml when converter contract changes
+# Web app (node_modules NOT committed — install first)
+cd apps/web && pnpm install && npx vitest run      # 31 tests
+cd apps/web && npx tsc --noEmit                     # typecheck
+pnpm dev                                            # local Next.js server -> :3000
 
-# Web app
-cd apps/web && npx vitest run               # 22 tests (engine + conversation)
-pnpm dev                                    # local Next.js server
+# Python pipeline (uses the SA3 venv in the OLD repo, NOT here)
+JAM_BUDDY_PYTHON=/d/CODE/unstable-drums/stable-audio-3/.venv/Scripts/python.exe \
+  python3 tools/jam_buddy.py --midi take.mid --instrument bass --out out.wav
 
-# Conversion CLI
-python gp5_to_keyswitched_mid.py path/to/song.gp5            # → keyswitched MIDI per track
-python gp5_to_keyswitched_mid.py path/to/song.gp5 output.mid # explicit output
-python gp5_to_keyswitched_mid.py song.gp5 -b                 # also process bass
-python gp5_to_keyswitched_mid.py song.gp5 -V 100 -r          # velocity 100, sustain reset
+# Conversion CLIs (if needed)
+python gp5_to_keyswitched_mid.py path/to/song.gp5
 ```
 
-## Test golden-file contract
+## Test contract
 
-- Canonical corpus: `gp5_songs/` (Altars, Sacrifice, The) — **deliberately not
-  in git**. The committed `tests/expected/baseline.yaml` encodes the expected
-  output so the converter can be validated against a fixed contract without the
-  source files.
-- `tests/fixtures/` holds scratch GP5 files (also not in git) for one-off
-  converter experiments.
-- When the converter contract intentionally changes: run
-  `python tests/record_expected.py` to regenerate the baseline, then review the
-  diff carefully. Never blanket-regenerate to hide a regression.
+- Web: `apps/web/__tests__/` — `prompt.test.ts` (prompt builder),
+  `player.test.ts` (midi parsing/player), `engine.test.ts`, `conversation.test.ts`.
+- Python: `tests/` — GP5 conversion against `tests/expected/baseline.yaml`.
 
 ## Conventions
 
-- TS for web, Python 3.10+ for conversion/audio, JSON for pattern templates.
-- Python: ruff lint, black format, type hints, Pydantic for data models.
-- TS: ESLint + Prettier, no `any` unless commented, no `useEffect` for derived
-  state.
-- Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`), branches
-  `feat/*`, `fix/*`, `docs/*`, `chore/*`.
-- Accessibility-first (this is a screenreader-native product): axe-core in CI,
-  NVDA + VoiceOver manual checks before each demo.
+- TS for web, Python 3.10+ for audio/conversion.
+- Accessibility-first (screenreader-native): axe-core, NVDA + VoiceOver checks.
+- Conventional Commits, `feat/*`/`fix/*`/`docs/*`/`chore/*` branches.
 
-## Scratch / not-in-git
+## Not-in-git (deliberately)
 
-- `*.gp5`, `*.gp`, `gp5_songs/`, `tests/fixtures/`, `fallen_events.json`,
-  `summoning_js_events.json`, `text2midi/` are all gitignored.
-- Song source data stays local. Only baseline + code + docs are committed.
+- `stable-audio-3/` + `text2midi/` (vendored models) live in the previous dir;
+  referenced via `JAM_BUDDY_PYTHON`. Don't copy them into this repo.
+- `node_modules/`, `.next/`, `generations/*.wav` — regenerable.
+
+See `docs/HANDOFF.md` for the full resume guide and current product state.
