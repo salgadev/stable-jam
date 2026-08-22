@@ -259,7 +259,10 @@ def main():
     raw = submit_and_poll(payload, files)
     with open(args.out, "wb") as f:
         f.write(raw)
-    print(f"Wrote {args.out}: {len(raw)} bytes (expected credits used: {CREDITS_PER_GEN})")
+    # Print the BPM in the route's parseable format (same as jam_buddy.py's
+    # "Wrote ...: <dur>s @ <bpm> BPM") so the webapp reads 158, not 120.
+    print(f"Wrote {args.out}: {args.duration:.1f}s @ {int(round(bpm))} BPM "
+          f"({len(raw)} bytes, expected credits used: {CREDITS_PER_GEN})")
 
 
 if __name__ == "__main__":

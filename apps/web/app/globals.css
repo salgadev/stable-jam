@@ -35,8 +35,9 @@
   font-weight: bold;
 }
 
-/* Rotary knob = a styled <input type=range>. The dial arc is drawn with a
- * conic gradient sized by the --knob-pct custom property. */
+/* Rotary knob = a styled <input type=range>. A metallic potentiometer: a
+ * brushed-aluminum body with a knurled edge, a gloss highlight, and a real
+ * pointer line that rotates with the value (read off --knob-pct). */
 .jambuddy-knob {
   -webkit-appearance: none;
   appearance: none;
@@ -44,34 +45,59 @@
   height: 3.5rem;
   border-radius: 9999px;
   background:
-    radial-gradient(circle at 50% 50%, #2c2f42 0%, #1a1c28 70%),
-    conic-gradient(
-      #f4a261 0deg,
-      #f4a261 calc(var(--knob-pct) * 3.6deg),
-      #34384b calc(var(--knob-pct) * 3.6deg),
-      #34384b 360deg
-    );
-  border: 2px solid #3a3e52;
+    radial-gradient(circle at 50% 50%, #dfe3ea 0%, #aeb4c0 34%, #5b6270 68%, #3a3f4a 100%);
+  border: 2px solid #2a2d3d;
   cursor: pointer;
   position: relative;
-  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.5),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.45),
+    0 3px 6px rgba(0, 0, 0, 0.6);
+  /* Pointer line + knurl tick marks drawn on top of the metal body. */
 }
+/* The pointer: a rotating dark line on the brushed aluminum face. We put it on
+ * a ::before overlay and rotate it by the knob's percentage (0-100% -> 0-300deg
+ * sweep, starting at -135deg so it reads like a real pot dial). */
+.jambuddy-knob::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 9999px;
+  background:
+    conic-gradient(
+      from -135deg,
+      transparent 0deg,
+      transparent calc(var(--knob-pct) * 3deg - 6deg),
+      #12131b 0deg calc(var(--knob-pct) * 3deg),
+      transparent calc(var(--knob-pct) * 3deg) 360deg
+    );
+  opacity: 0.9;
+}
+/* The pointer line itself (the "needle"). */
+.jambuddy-knob::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 26px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #14161d, #3a3f4a 45%, #14161d);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  transform: translate(-50%, -100%) rotate(calc(var(--knob-pct) * 3deg));
+  transform-origin: 50% 100%;
+}
+/* Range thumb hidden — the pointer is drawn by ::after so the native thumb is
+   invisible; keep it transparent to preserve drag interaction. */
 .jambuddy-knob::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 4px;
-  height: 16px;
-  border-radius: 2px;
-  background: #f0ede6;
-  border: 1px solid #000;
-  transform: translateY(-6px);
+  width: 0;
+  height: 0;
 }
 .jambuddy-knob::-moz-range-thumb {
-  width: 4px;
-  height: 16px;
-  border-radius: 2px;
-  background: #f0ede6;
-  border: 1px solid #000;
+  width: 0;
+  height: 0;
 }
 
 /* The big trigger button */
@@ -96,15 +122,16 @@
   cursor: wait;
 }
 
-/* Analog rocker switch for the engine (API / Local). A labelled checkbox
- * hidden inside; the visual is a two-position rocker with a center pivot,
- * matching the hardware-sampler aesthetic. Keyboard/screenreader usable. */
+/* Metal rocker switch for the engine (API / Local). A labelled checkbox hidden
+ * inside; the visual is a brushed-steel two-position rocker with a center
+ * divider and an inset "pressed" face on the active side — the analog
+ * hardware toggle look. Keyboard/screenreader usable via the hidden input. */
 .engine-toggle {
   position: relative;
   display: inline-flex;
   align-items: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -116,25 +143,58 @@
 }
 .engine-toggle__track {
   display: inline-flex;
-  border: 1px solid #2a2d3d;
+  position: relative;
   border-radius: 9999px;
-  background: #15161f;
-  overflow: hidden;
+  background: linear-gradient(180deg, #c9ced6 0%, #9aa1ac 45%, #6d7480 100%);
+  padding: 3px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .engine-toggle__opt {
-  padding: 0.35rem 0.9rem;
-  color: #7f829c;
-  transition: background 0.15s, color 0.15s;
-}
-.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--api {
-  background: #f4a261;
-  color: #12131b;
+  position: relative;
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  color: #2a2d3d;
   font-weight: 700;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+  z-index: 1;
+}
+/* The center divider — a vertical screw/knurl that reads as the switch hinge. */
+.engine-toggle__track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 70%;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.35));
+  z-index: 2;
+  border-radius: 1px;
+}
+/* Active (checked = API) side pressed-in, inactive side raised. */
+.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--api {
+  background: linear-gradient(180deg, #f4a261, #e07b3a);
+  color: #12131b;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px);
+}
+.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--local {
+  background: linear-gradient(180deg, #eef0f4, #c9ced8);
+  color: #2a2d3d;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .engine-toggle input:not(:checked) + .engine-toggle__track .engine-toggle__opt--local {
-  background: #5fd38a;
+  background: linear-gradient(180deg, #5fd38a, #3aa55f);
   color: #12131b;
-  font-weight: 700;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px);
+}
+.engine-toggle input:not(:checked) + .engine-toggle__track .engine-toggle__opt--api {
+  background: linear-gradient(180deg, #eef0f4, #c9ced8);
+  color: #2a2d3d;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .engine-toggle input:focus-visible + .engine-toggle__track {
   outline: 3px solid var(--focus);
