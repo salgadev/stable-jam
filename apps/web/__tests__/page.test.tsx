@@ -30,6 +30,17 @@ vi.mock("@/lib/jambuddy/recorder", () => ({
     isActive: vi.fn(() => false),
     dispose: vi.fn(),
   })),
+  createAudioRecorder: vi.fn(async () => ({
+    start: vi.fn(),
+    stop: vi.fn(async () => ({
+      file: new File([new Uint8Array([1, 2, 3])], "cap.webm", {
+        type: "audio/webm",
+      }),
+      durationSec: 1.5,
+    })),
+    isActive: vi.fn(() => false),
+    dispose: vi.fn(),
+  })),
   recordedNotesAsFile: vi.fn(() => new File([""], "cap.mid")),
 }));
 
@@ -122,5 +133,43 @@ describe("PLAY TOGETHER toggle", () => {
     expect(
       screen.getByRole("button", { name: "PLAY TOGETHER" }),
     ).toBeEnabled();
+  });
+});
+
+describe("RECORD source toggle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.stubGlobal("URL.createObjectURL", createObjectURL);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("defaults to MIDI and switches to audio when the Record toggle flips", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Default source is MIDI.
+    const recBtn = screen.getByRole("button", {
+      name: "Record from MIDI controller",
+    });
+    expect(recBtn).toBeInTheDocument();
+
+    // Flip the Record source toggle. DOM order: Engine toggle first, Record
+    // toggle second. The Record toggle starts unchecked (recordSource='midi').
+    const toggles = screen.getAllByRole("checkbox");
+    expect(toggles.length).toBeGreaterThanOrEqual(2);
+    await user.click(toggles[1]);
+
+    // Now the RECORD button targets audio.
+    const audioBtn = screen.getByRole("button", {
+      name: "Record from microphone",
+    });
+    expect(audioBtn).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Record from MIDI controller" }),
+    ).not.toBeInTheDocument();
   });
 });
