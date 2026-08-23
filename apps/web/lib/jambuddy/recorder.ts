@@ -154,3 +154,82 @@ export async function createMidiRecorder(
     },
   };
 }
+
+/**
+ * Audio capture via getUserMedia + MediaRecorder (mic / audio interface).
+ *
+ * Returns a recorder with start/stop; stop() yields the captured audio as a
+ * File (.webm) so it can feed the same take pipeline (tempo detect + duration
+ * + audio-to-audio generation) as an uploaded audio take.
+ *
+ * Browser-only. Requires a mic permission grant (user gesture).
+ */
+export interface AudioRecorder {
+  start(): void;
+  stop(): Promise<{ file: File; durationSec: number }>;
+  isActive(): boolean;
+  dispose(): void;
+}
+
+/**
+ * Create an audio recorder. Requests microphone access (user gesture). Throws
+ * if getUserMedia/MediaRecorder is unsupported or the mic is denied.
+ */
+export async function createAudioRecorder(): Promise<AudioRecorder> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getUserMedia ||
+    typeof MediaRecorder === "undefined"
+  ) {
+    throw new Error(
+      "Audio recording is not supported in this browser (need mic + MediaRecorder).",
+    );
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const rec = new MediaRecorder(stream);
+  const chunks: BlobPart[] = [];
+  let startTime = 0;
+  let active = false;
+
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
+  };
+
+  return {
+    start() {
+      startTime = performance.now();
+      chunks.length = 0;
+      active = true;
+      rec.start();
+    },
+    stop() {
+      return new Promise((resolve) => {
+        const onStop = () => {
+          active = false;
+          stream.getTracks().forEach((t) => t.stop());
+          const type = rec.mimeType || "audio/webm";
+          const file = new File(
+            chunks,
+            `jambuddy-live-audio-${new Date()
+              .toISOString()
+              .replace(/[-:]/g, "")
+              .replace(/\.\d+Z$/, "Z")}.webm`,
+            { type },
+          );
+          resolve({
+            file,
+            durationSec: (performance.now() - startTime) / 1000,
+          });
+        };
+        rec.addEventListener("stop", onStop, { once: true });
+        rec.stop();
+      });
+    },
+    isActive: () => active,
+    dispose() {
+      active = false;
+      stream.getTracks().forEach((t) => t.stop());
+    },
+  };
+}

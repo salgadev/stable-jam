@@ -17,7 +17,13 @@ import {
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
 import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether } from "@/lib/jambuddy/player";
-import { createMidiRecorder, recordedNotesAsFile, type MidiRecorder } from "@/lib/jambuddy/recorder";
+import {
+  createMidiRecorder,
+  createAudioRecorder,
+  recordedNotesAsFile,
+  type MidiRecorder,
+  type AudioRecorder,
+} from "@/lib/jambuddy/recorder";
 import { Visualizer } from "@/lib/jambuddy/visualizer";
 
 /**
@@ -146,10 +152,12 @@ export default function HomePage() {
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
   const [mode, setMode] = useState<"api" | "local">("api");
-  // Live MIDI capture. recRef holds the active recorder; recording is a state
-  // so the big RED button reflects it.
-  const recRef = useRef<MidiRecorder | null>(null);
+  // Live capture. recRef holds the active recorder (MIDI or audio); recording
+  // is a state so the big RED button reflects it. recordSource lets the user
+  // pick what to record (MIDI from a controller, or audio from the mic/interface).
+  const recRef = useRef<MidiRecorder | AudioRecorder | null>(null);
   const [recording, setRecording] = useState(false);
+  const [recordSource, setRecordSource] = useState<"midi" | "audio">("midi");
   // Object URL of the last recorded MIDI take (for save + piano-roll).
   const [recordedMidiUrl, setRecordedMidiUrl] = useState<string | null>(null);
 
@@ -255,45 +263,72 @@ export default function HomePage() {
     return null;
   }
 
-  /** Toggle live MIDI capture. On stop, the take is written as a .mid file and
-   * fed through the normal take pipeline (tempo detect + duration + input). */
+  /** Toggle live capture (MIDI from a controller, or audio from the mic).
+   * On stop, the take is written to a .mid/.webm File and fed through the
+   * normal take pipeline (tempo detect + duration + input). */
   async function toggleRecord() {
     if (recording) {
-      // Stop: convert recorded notes to a .mid File and treat as a MIDI take.
+      // Stop: convert the capture to a take File and treat it as a take.
       const rec = recRef.current;
       if (rec) {
-        const { notes, durationSec } = rec.stop();
-        rec.dispose();
-        recRef.current = null;
-        setRecording(false);
-        if (notes.length === 0) {
-          setStatus("Recording stopped — no notes captured.");
-          return;
+        if (recordSource === "midi") {
+          const midiRec = rec as MidiRecorder;
+          const { notes, durationSec } = midiRec.stop();
+          rec.dispose();
+          recRef.current = null;
+          setRecording(false);
+          if (notes.length === 0) {
+            setStatus("Recording stopped — no notes captured.");
+            return;
+          }
+          // Use the current knob BPM (or 120) for the tempo map of the .mid.
+          const file = recordedNotesAsFile(notes, bpm || 120);
+          // Keep an object URL so the user can save the .mid and see its roll.
+          if (recordedMidiUrl) URL.revokeObjectURL(recordedMidiUrl);
+          setRecordedMidiUrl(URL.createObjectURL(file));
+          setStatus(
+            `Captured ${notes.length} notes (${durationSec.toFixed(1)}s). Detecting tempo…`,
+          );
+          await handleTakeFile(file);
+        } else {
+          const audioRec = rec as AudioRecorder;
+          const { file, durationSec } = await audioRec.stop();
+          rec.dispose();
+          recRef.current = null;
+          setRecording(false);
+          setStatus(
+            `Captured ${durationSec.toFixed(1)}s of audio. Detecting tempo…`,
+          );
+          await handleTakeFile(file);
         }
-        // Use the current knob BPM (or 120) for the tempo map of the .mid.
-        const file = recordedNotesAsFile(notes, bpm || 120);
-        // Keep an object URL so the user can save the .mid and see its roll.
-        if (recordedMidiUrl) URL.revokeObjectURL(recordedMidiUrl);
-        setRecordedMidiUrl(URL.createObjectURL(file));
-        setStatus(
-          `Captured ${notes.length} notes (${durationSec.toFixed(1)}s). Detecting tempo…`,
-        );
-        await handleTakeFile(file);
       } else {
         setRecording(false);
       }
       return;
     }
     // Start: create the recorder + begin listening.
-    setStatus("Connecting to MIDI controller…");
-    try {
-      const rec = await createMidiRecorder();
-      recRef.current = rec;
-      rec.start();
-      setRecording(true);
-      setStatus("● RECORDING — play your take, then press stop.");
-    } catch (e) {
-      setStatus(`MIDI record unavailable: ${String(e)}`);
+    if (recordSource === "midi") {
+      setStatus("Connecting to MIDI controller…");
+      try {
+        const rec = await createMidiRecorder();
+        recRef.current = rec;
+        rec.start();
+        setRecording(true);
+        setStatus("● RECORDING — play your take, then press stop.");
+      } catch (e) {
+        setStatus(`MIDI record unavailable: ${String(e)}`);
+      }
+    } else {
+      setStatus("Requesting microphone access…");
+      try {
+        const rec = await createAudioRecorder();
+        recRef.current = rec;
+        rec.start();
+        setRecording(true);
+        setStatus("● RECORDING — play your take, then press stop.");
+      } catch (e) {
+        setStatus(`Audio record unavailable: ${String(e)}`);
+      }
     }
   }
 
@@ -608,6 +643,35 @@ export default function HomePage() {
               : "Local CPU · free · supports negative prompt · slower"}
           </span>
         </div>
+        {/* Record source — MIDI controller or mic/interface */}
+        <div className="mb-3 flex items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+            Record
+          </span>
+          <label className="engine-toggle">
+            <input
+              type="checkbox"
+              checked={recordSource === "audio"}
+              onChange={(e) =>
+                setRecordSource(e.target.checked ? "audio" : "midi")
+              }
+            />
+            <span className="engine-toggle__switch">
+              <span className="engine-toggle__label engine-toggle__label--local">
+                MIDI
+              </span>
+              <span className="engine-toggle__lever" aria-hidden="true" />
+              <span className="engine-toggle__label engine-toggle__label--api">
+                Audio
+              </span>
+            </span>
+          </label>
+          <span className="font-mono text-[10px] text-[#7f829c]">
+            {recordSource === "midi"
+              ? "MIDI controller"
+              : "Mic / audio interface"}
+          </span>
+        </div>
         {/* Transport — sampler/sequencer pads */}
         <div className="mb-2 grid grid-cols-3 gap-4">
           <button
@@ -615,7 +679,13 @@ export default function HomePage() {
             onClick={toggleRecord}
             disabled={busy}
             aria-pressed={recording}
-            aria-label={recording ? "Stop recording" : "Record from MIDI controller"}
+            aria-label={
+              recording
+                ? "Stop recording"
+                : recordSource === "midi"
+                  ? "Record from MIDI controller"
+                  : "Record from microphone"
+            }
             className="jambuddy-padbig flex-1"
             style={{ ["--pad-c" as string]: "#e05252" }}
           >
