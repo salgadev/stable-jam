@@ -73,6 +73,22 @@ function Knob({
   // calc(<percentage> * <angle>) — passing the degrees directly keeps the
   // needle + arc in sync with the value.
   const rot = `${pct * 3}deg`;
+
+  // For editable knobs (e.g. tempo), hold a local draft while typing so we
+  // don't clamp mid-keystroke. Type "158": "1" → draft "1", "15" → draft
+  // "15", "158" → commit on blur/Enter (clamped to [min,max]).
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = Number(draft);
+    const clamped = Number.isFinite(n)
+      ? Math.min(max, Math.max(min, n))
+      : value;
+    setDraft(null);
+    if (clamped !== value) onChange(clamped);
+  };
+  const syncDraft = () => setDraft(String(value));
+
   return (
     <label className={`flex flex-col items-center gap-1 ${disabled ? "opacity-40" : ""}`}>
       <span className="text-[10px] uppercase tracking-widest text-[#7f8c9b]">
@@ -96,13 +112,19 @@ function Knob({
           min={min}
           max={max}
           step={step ?? 1}
-          value={value}
+          // Controlled by the draft while editing; otherwise the prop value.
+          value={draft === null ? value : draft}
           aria-label={`${label} value`}
           disabled={disabled}
-          onChange={(e) => {
-            const v = e.target.value === "" ? min : Number(e.target.value);
-            onChange(Math.min(max, Math.max(min, v)));
+          onFocus={syncDraft}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              commit();
+              (e.target as HTMLInputElement).blur();
+            }
           }}
+          onChange={(e) => setDraft(e.target.value)}
           className="w-16 rounded border border-[#2a2d3d] bg-[#12131b] px-1 text-center font-mono text-sm font-bold text-[#e8e8f0]"
         />
       ) : (
