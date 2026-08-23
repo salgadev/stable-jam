@@ -158,6 +158,13 @@ function Pad({
   );
 }
 
+/** Bundled demo MIDI takes, shown as clickable examples (Gradio-style). */
+const DEMO_MIDIS = [
+  { name: "sacrifice-drums", label: "Sacrifice (drums)" },
+  { name: "halftime-opening", label: "Half-time opening" },
+  { name: "hextermination-blast", label: "Hextermination blast" },
+];
+
 export default function HomePage() {
   const [instrument, setInstrument] = useState<BuddyInstrument>("bass");
   const [inputInstrument, setInputInstrument] = useState<InputInstrument>("other");
@@ -228,6 +235,23 @@ export default function HomePage() {
       f.type === "audio/midi" ||
       f.type === "audio/x-midi"
     );
+  }
+
+  /** Load a bundled demo MIDI (served from /demos) as a take. */
+  async function loadDemo(name: string) {
+    setStatus(`Loading demo "${name}"…`);
+    try {
+      const res = await fetch(`/demos/${name}.mid`);
+      if (!res.ok) throw new Error(`fetch ${name}.mid -> ${res.status}`);
+      const bytes = await res.arrayBuffer();
+      // A File with the right name/type flows through the exact same path as
+      // an upload (isMidiFile → tempo detect → duration).
+      const file = new File([bytes], `${name}.mid`, { type: "audio/midi" });
+      await handleTakeFile(file);
+      setStatus(`Loaded demo "${name}".`);
+    } catch (e) {
+      setStatus(`Couldn't load demo: ${String(e)}`);
+    }
   }
 
   /** Handle a single uploaded take (MIDI or audio), auto-detecting the type. */
@@ -684,6 +708,23 @@ export default function HomePage() {
               {audioFile.name} — audio: buddy responds to its groove (audio-to-audio).
             </p>
           )}
+          {/* Gradio-style demo examples: click to load the demo MIDI as a take. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+              Demos
+            </span>
+            {DEMO_MIDIS.map((d) => (
+              <button
+                key={d.name}
+                type="button"
+                onClick={() => loadDemo(d.name)}
+                disabled={busy}
+                className="rounded-full border border-[#2a2d3d] bg-[#1a1c28] px-3 py-1 text-xs text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Transport */}
