@@ -22,10 +22,13 @@ RUN cd apps/web && pnpm build
 FROM node:20-slim
 WORKDIR /app
 
-# Python for the SA3 API adapter (lightweight: no torch).
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+# Python for the SA3 API adapter (lightweight: no torch). Debian's python is
+# externally managed (PEP 668), so install into a venv and point JAM_BUDDY_PYTHON
+# at it.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
-ENV JAM_BUDDY_PYTHON=/usr/bin/python3
+RUN python3 -m venv /opt/jambuddy-venv
+ENV JAM_BUDDY_PYTHON=/opt/jambuddy-venv/bin/python
 
 # Copy the built web app + the tools the API route shells to.
 COPY --from=web-build /app/apps/web/.next apps/web/.next
@@ -39,7 +42,7 @@ COPY tools tools
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Python deps for tools/jam_buddy_api.py (requests, mido, librosa, scipy, soundfile, numpy).
-RUN python3 -m pip install --no-cache-dir requests mido librosa scipy soundfile numpy
+RUN /opt/jambuddy-venv/bin/pip install --no-cache-dir requests mido librosa scipy soundfile numpy
 
 # HF Spaces expects the app on port 7860.
 ENV PORT=7860
