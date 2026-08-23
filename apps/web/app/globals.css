@@ -55,9 +55,8 @@
     0 3px 6px rgba(0, 0, 0, 0.6);
   /* Pointer line + knurl tick marks drawn on top of the metal body. */
 }
-/* The pointer: a rotating dark line on the brushed aluminum face. We put it on
- * a ::before overlay and rotate it by the knob's percentage (0-100% -> 0-300deg
- * sweep, starting at -135deg so it reads like a real pot dial). */
+/* The arc: a conic-gradient slice rotated to the knob's angle. --knob-rot is
+ * passed as an angle (e.g. 150deg), not a percentage, so the sweep is valid. */
 .jambuddy-knob::before {
   content: "";
   position: absolute;
@@ -67,9 +66,9 @@
     conic-gradient(
       from -135deg,
       transparent 0deg,
-      transparent calc(var(--knob-pct) * 3deg - 6deg),
-      #12131b 0deg calc(var(--knob-pct) * 3deg),
-      transparent calc(var(--knob-pct) * 3deg) 360deg
+      transparent calc(var(--knob-rot, 0deg) - 6deg),
+      #12131b calc(var(--knob-rot, 0deg) - 6deg) var(--knob-rot, 0deg),
+      transparent var(--knob-rot, 0deg) 360deg
     );
   opacity: 0.9;
 }
@@ -84,7 +83,7 @@
   border-radius: 2px;
   background: linear-gradient(180deg, #14161d, #3a3f4a 45%, #14161d);
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
-  transform: translate(-50%, -100%) rotate(calc(var(--knob-pct) * 3deg));
+  transform: translate(-50%, -100%) rotate(var(--knob-rot, 0deg));
   transform-origin: 50% 100%;
 }
 /* Range thumb hidden — the pointer is drawn by ::after so the native thumb is

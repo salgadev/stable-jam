@@ -53,6 +53,10 @@ function Knob({
   disabled?: boolean;
 }) {
   const pct = ((value - min) / (max - min)) * 100;
+  // --knob-rot is an actual angle (degrees), NOT a percentage. CSS can't do
+  // calc(<percentage> * <angle>) — passing the degrees directly keeps the
+  // needle + arc in sync with the value.
+  const rot = `${pct * 3}deg`;
   return (
     <label className={`flex flex-col items-center gap-1 ${disabled ? "opacity-40" : ""}`}>
       <span className="text-[10px] uppercase tracking-widest text-[#7f8c9b]">
@@ -68,7 +72,7 @@ function Knob({
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         className="jambuddy-knob"
-        style={{ ["--knob-pct" as string]: `${pct}%` }}
+        style={{ ["--knob-rot" as string]: rot }}
       />
       <span className="font-mono text-sm font-bold text-[#e8e8f0]">
         {disabled ? "from take" : format(value)}
