@@ -490,6 +490,13 @@ export default function HomePage() {
           />
         </section>
 
+        {/* Prompt — mirrors the knobs, shown right below them */}
+        <div className="mb-6 rounded bg-[#15161f] px-4 py-2 font-mono text-xs text-[#7f829c]">
+          <div className="uppercase tracking-widest">Prompt</div>
+          <div className="mt-1 truncate text-[#e8e8f0]">{prompt}</div>
+          <div className="mt-1 opacity-60">neg: {negativePrompt}</div>
+        </div>
+
         {/* Your-take-is knob — declares what instrument the user is playing
             so the buddy can complement it (no MIR on input). */}
         <section
@@ -575,68 +582,43 @@ export default function HomePage() {
               : "Local CPU · free · supports negative prompt · slower"}
           </span>
         </div>
-        <div className="mb-2 flex items-center gap-4">
+        {/* Transport — sampler/sequencer pads */}
+        <div className="mb-2 grid grid-cols-3 gap-4">
           <button
             type="button"
             onClick={toggleRecord}
             disabled={busy}
             aria-pressed={recording}
             aria-label={recording ? "Stop recording" : "Record from MIDI controller"}
-            className="jambuddy-record flex-1"
+            className="jambuddy-padbig flex-1"
+            style={{ ["--pad-c" as string]: "#e05252" }}
           >
-            {recording ? "■ STOP" : "● RECORD"}
-          </button>
-          <button
-            type="button"
-            onClick={saveRecordedMidi}
-            disabled={!recordedMidiUrl || busy}
-            className="jambuddy-trigger flex-1"
-            style={{
-              background: "linear-gradient(180deg,#5fd38a 0%,#3aa55f 100%)",
-              boxShadow: "0 2px 0 #256b3f",
-            }}
-          >
-            SAVE MIDI
-          </button>
-          <button
-            type="button"
-            onClick={saveGeneratedAudio}
-            disabled={!audioUrl || busy}
-            className="jambuddy-trigger flex-1"
-            style={{
-              background: "linear-gradient(180deg,#5fd38a 0%,#3aa55f 100%)",
-              boxShadow: "0 2px 0 #256b3f",
-            }}
-          >
-            SAVE AUDIO
+            <span className="jambuddy-padbig__label">
+              {recording ? "■ STOP" : "● RECORD"}
+            </span>
           </button>
           <button
             type="button"
             onClick={joinIn}
             disabled={busy}
-            className="jambuddy-trigger flex-1"
+            className="jambuddy-padbig flex-1"
+            style={{ ["--pad-c" as string]: "#f4a261" }}
           >
-            {busy ? "PRODUCING…" : "JOIN IN"}
+            <span className="jambuddy-padbig__label">
+              {busy ? "PRODUCING…" : "JOIN IN"}
+            </span>
           </button>
           <button
             type="button"
             onClick={playBoth}
             disabled={!audioUrl || isPlayingTogether}
-            className="jambuddy-trigger flex-1"
-            style={{
-              background: "linear-gradient(180deg,#f4a261 0%,#e07b3a 100%)",
-              boxShadow: "0 2px 0 #a85a24",
-            }}
+            className="jambuddy-padbig flex-1"
+            style={{ ["--pad-c" as string]: "#5fd38a" }}
           >
-            {isPlayingTogether ? "PLAYING…" : "PLAY TOGETHER"}
+            <span className="jambuddy-padbig__label">
+              {isPlayingTogether ? "PLAYING…" : "PLAY TOGETHER"}
+            </span>
           </button>
-          <div className="font-mono text-xs text-[#7f829c]">
-            <div className="uppercase tracking-widest">Prompt</div>
-            <div className="mt-1 max-w-[16rem] truncate text-[#e8e8f0]">
-              {prompt}
-            </div>
-            <div className="mt-1 opacity-60">neg: {negativePrompt}</div>
-          </div>
         </div>
 
         {/* Status + playback */}
@@ -671,28 +653,59 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Take + response visualizers — stacked vertically, DAW-style */}
+        {/* Take + response visualizers — stacked vertically, DAW-style.
+            Each waveform has its own SAVE button beside it. */}
         {(midiBytes || takeAudioUrl || audioUrl) && (
           <section
             aria-label="Take and response"
             className="mt-4 flex flex-col gap-4"
           >
             {midiBytes ? (
-              <Visualizer
-                midiBytes={midiBytes}
-                label="Your take (MIDI piano-roll)"
-              />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Visualizer
+                    midiBytes={midiBytes}
+                    label="Your take (MIDI piano-roll)"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={saveRecordedMidi}
+                  disabled={!recordedMidiUrl}
+                  className="jambuddy-save"
+                  title="Download this MIDI take"
+                >
+                  SAVE
+                </button>
+              </div>
             ) : takeAudioUrl ? (
-              <Visualizer
-                audioUrl={takeAudioUrl}
-                label="Your take (audio waveform)"
-              />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Visualizer
+                    audioUrl={takeAudioUrl}
+                    label="Your take (audio waveform)"
+                  />
+                </div>
+              </div>
             ) : null}
             {audioUrl && (
-              <Visualizer
-                audioUrl={audioUrl}
-                label="Buddy response (waveform)"
-              />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Visualizer
+                    audioUrl={audioUrl}
+                    label="Buddy response (waveform)"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={saveGeneratedAudio}
+                  disabled={!audioUrl}
+                  className="jambuddy-save"
+                  title="Download this response"
+                >
+                  SAVE
+                </button>
+              </div>
             )}
           </section>
         )}

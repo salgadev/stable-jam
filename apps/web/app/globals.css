@@ -121,6 +121,68 @@
   cursor: wait;
 }
 
+/* Sampler/sequencer transport pad — a big backlit pad with an LED color
+ * (set via --pad-c) that brightens when pressed. */
+.jambuddy-padbig {
+  border-radius: 0.6rem;
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(180deg, #2a2d3d 0%, #1a1c28 100%);
+  color: var(--pad-c, #f4a261);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 1.1rem 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 -4px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 3px 0 rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+.jambuddy-padbig:hover {
+  filter: brightness(1.12);
+}
+.jambuddy-padbig[aria-pressed="true"],
+.jambuddy-padbig:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    0 0 16px var(--pad-c, #f4a261),
+    0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.jambuddy-padbig:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
+.jambuddy-padbig__label {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Small SAVE button pinned beside a waveform. */
+.jambuddy-save {
+  border-radius: 0.4rem;
+  border: 1px solid #2a2d3d;
+  background: linear-gradient(180deg, #2a2d3d 0%, #1a1c28 100%);
+  color: #5fd38a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.jambuddy-save:hover {
+  filter: brightness(1.2);
+}
+.jambuddy-save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* Big RED record button — a physical record arm with a glowing tip. */
 .jambuddy-record {
   border-radius: 0.5rem;
