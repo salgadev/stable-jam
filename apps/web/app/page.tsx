@@ -336,12 +336,17 @@ export default function HomePage() {
   }
 
   /** Play the take and the buddy response together (audio mix, or MIDI synth).
-   * Toggle: pressing again stops playback. */
+   * Toggle: pressing again stops playback.
+   *
+   * Re-entry guard: isPlayingTogether is React state (async), so a fast second
+   * click can read a stale `false` and start a SECOND simultaneous layer. Keep
+   * a synchronous ref so the toggle is atomic. */
   const playbackRef = useRef<{ stop: () => void } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   async function playBoth() {
-    if (isPlayingTogether) {
-      // Stop: kill current playback.
-      playbackRef.current?.stop();
+    if (playbackRef.current) {
+      // Stop: kill current playback (synchronous — immune to stale state).
+      playbackRef.current.stop();
       playbackRef.current = null;
       setIsPlayingTogether(false);
       setStatus("Stopped.");
@@ -351,25 +356,32 @@ export default function HomePage() {
       setStatus("Generate a response first.");
       return;
     }
+    // Pause the standalone audio element so the response isn't heard twice.
+    audioRef.current?.pause();
+    playbackRef.current = { stop: () => {} }; // claim the toggle synchronously
     setIsPlayingTogether(true);
     setStatus("Playing your take + the buddy together…");
     try {
+      let handle: { stop: () => void; done: Promise<void> };
       if (midiBytes) {
         // MIDI take: render with the built-in synth, layered with the buddy.
-        const handle = await playTogether(midiBytes, audioUrl);
-        playbackRef.current = handle;
-        await handle.done;
+        handle = await playTogether(midiBytes, audioUrl);
       } else if (takeAudioUrl) {
         // Audio take: mix the two audio files on the same clock.
-        const handle = await playAudioTogether(takeAudioUrl, audioUrl);
-        playbackRef.current = handle;
-        await handle.done;
+        handle = await playAudioTogether(takeAudioUrl, audioUrl);
       } else {
+        playbackRef.current = null;
+        setIsPlayingTogether(false);
         setStatus("Load a take first to play it with the response.");
+        return;
       }
-      playbackRef.current = null;
-      setIsPlayingTogether(false);
-      setStatus("Done — both played together.");
+      playbackRef.current = handle;
+      await handle.done;
+      if (playbackRef.current === handle) {
+        playbackRef.current = null;
+        setIsPlayingTogether(false);
+        setStatus("Done — both played together.");
+      }
     } catch (e) {
       playbackRef.current = null;
       setIsPlayingTogether(false);
@@ -662,7 +674,12 @@ export default function HomePage() {
             </p>
           )}
           {audioUrl && (
-            <audio controls src={audioUrl} className="mt-3 w-full">
+            <audio
+              ref={audioRef}
+              controls
+              src={audioUrl}
+              className="mt-3 w-full"
+            >
               Your browser does not support audio playback.
             </audio>
           )}
