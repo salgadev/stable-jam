@@ -161,26 +161,33 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-/* Small SAVE button pinned beside a waveform. */
+/* Icon download button pinned beside a waveform — sized to match the track,
+ * vertically centered, with a visible border and hover glow. */
 .jambuddy-save {
-  border-radius: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.5rem;
   border: 1px solid #2a2d3d;
   background: linear-gradient(180deg, #2a2d3d 0%, #1a1c28 100%);
   color: #5fd38a;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 0.5rem 0.9rem;
   cursor: pointer;
-  white-space: nowrap;
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.08s;
 }
 .jambuddy-save:hover {
   filter: brightness(1.2);
+  box-shadow: 0 0 10px rgba(95, 211, 138, 0.3);
+}
+.jambuddy-save:active {
+  transform: translateY(1px);
 }
 .jambuddy-save:disabled {
   opacity: 0.4;
   cursor: default;
+  box-shadow: none;
 }
 
 /* Big RED record button — a physical record arm with a glowing tip. */

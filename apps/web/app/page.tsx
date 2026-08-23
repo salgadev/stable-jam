@@ -335,8 +335,18 @@ export default function HomePage() {
     setStatus("Saved the buddy's response.");
   }
 
-  /** Play the take and the buddy response together (audio mix, or MIDI synth). */
+  /** Play the take and the buddy response together (audio mix, or MIDI synth).
+   * Toggle: pressing again stops playback. */
+  const playbackRef = useRef<{ stop: () => void } | null>(null);
   async function playBoth() {
+    if (isPlayingTogether) {
+      // Stop: kill current playback.
+      playbackRef.current?.stop();
+      playbackRef.current = null;
+      setIsPlayingTogether(false);
+      setStatus("Stopped.");
+      return;
+    }
     if (!audioUrl) {
       setStatus("Generate a response first.");
       return;
@@ -346,20 +356,24 @@ export default function HomePage() {
     try {
       if (midiBytes) {
         // MIDI take: render with the built-in synth, layered with the buddy.
-        const { done } = await playTogether(midiBytes, audioUrl);
-        await done;
+        const handle = await playTogether(midiBytes, audioUrl);
+        playbackRef.current = handle;
+        await handle.done;
       } else if (takeAudioUrl) {
         // Audio take: mix the two audio files on the same clock.
-        const { done } = await playAudioTogether(takeAudioUrl, audioUrl);
-        await done;
+        const handle = await playAudioTogether(takeAudioUrl, audioUrl);
+        playbackRef.current = handle;
+        await handle.done;
       } else {
         setStatus("Load a take first to play it with the response.");
       }
+      playbackRef.current = null;
+      setIsPlayingTogether(false);
       setStatus("Done — both played together.");
     } catch (e) {
-      setStatus(`Playback error: ${String(e)}`);
-    } finally {
+      playbackRef.current = null;
       setIsPlayingTogether(false);
+      setStatus(`Playback error: ${String(e)}`);
     }
   }
 
@@ -674,8 +688,15 @@ export default function HomePage() {
                   disabled={!recordedMidiUrl}
                   className="jambuddy-save"
                   title="Download this MIDI take"
+                  aria-label="Download this MIDI take"
                 >
-                  SAVE
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none"
+                    stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+                    strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="M6 11l6 6 6-6" />
+                    <path d="M4 20h16" />
+                  </svg>
                 </button>
               </div>
             ) : takeAudioUrl ? (
@@ -702,8 +723,15 @@ export default function HomePage() {
                   disabled={!audioUrl}
                   className="jambuddy-save"
                   title="Download this response"
+                  aria-label="Download this response"
                 >
-                  SAVE
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none"
+                    stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+                    strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="M6 11l6 6 6-6" />
+                    <path d="M4 20h16" />
+                  </svg>
                 </button>
               </div>
             )}
