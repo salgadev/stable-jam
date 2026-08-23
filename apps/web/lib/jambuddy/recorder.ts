@@ -239,6 +239,70 @@ export async function grantMicPermission(): Promise<MediaStream> {
 }
 
 /**
+ * Decode an audio Blob (any browser-playable format, e.g. WebM/Opus from
+ * MediaRecorder) into a 16-bit PCM WAV Blob. The Python pipeline reads the
+ * take with `soundfile`, which does NOT understand WebM — it needs a real WAV.
+ * Returns null if decode fails (caller can fall back to the raw blob).
+ */
+export async function blobToWav(blob: Blob): Promise<Blob | null> {
+  try {
+    const buf = await blob.arrayBuffer();
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return null;
+    const ctx = new Ctx();
+    try {
+      const audioBuf = await ctx.decodeAudioData(buf);
+      const numChannels = audioBuf.numberOfChannels ?? 1;
+      const sr = audioBuf.sampleRate ?? 44100;
+      const samples = audioBuf.getChannelData(0);
+      const numFrames = samples.length;
+      const interleaved = new Float32Array(numFrames * numChannels);
+      for (let ch = 0; ch < numChannels; ch++) {
+        const chan = audioBuf.getChannelData(ch);
+        for (let i = 0; i < numFrames; i++) {
+          const v = chan[i];
+          if (v !== undefined) interleaved[i * numChannels + ch] = v;
+        }
+      }
+      // 16-bit PCM WAV.
+      const buffer = new ArrayBuffer(44 + interleaved.length * 2);
+      const view = new DataView(buffer);
+      const writeStr = (off: number, s: string) => {
+        for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+      };
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + interleaved.length * 2, true);
+      writeStr(8, "WAVE");
+      writeStr(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sr, true);
+      view.setUint32(28, sr * numChannels * 2, true);
+      view.setUint16(32, numChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, interleaved.length * 2, true);
+      let off = 44;
+      for (let i = 0; i < interleaved.length; i++) {
+        const raw = interleaved[i] ?? 0;
+        const s = Math.max(-1, Math.min(1, raw));
+        view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        off += 2;
+      }
+      return new Blob([buffer], { type: "audio/wav" });
+    } finally {
+      void ctx.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Create an audio recorder. Requests microphone access (user gesture). Throws
  * if getUserMedia/MediaRecorder is unsupported or the mic is denied.
  *
@@ -289,17 +353,24 @@ export async function createAudioRecorder(
     },
     stop() {
       return new Promise((resolve) => {
-        const onStop = () => {
+        const onStop = async () => {
           active = false;
           stream.getTracks().forEach((t) => t.stop());
           const type = rec.mimeType || "audio/webm";
+          const raw = new Blob(chunks, { type });
+          // Convert WebM -> PCM WAV so the Python pipeline (soundfile) can read
+          // it. If decode fails, fall back to the raw blob.
+          const wav = await blobToWav(raw);
+          const ts = new Date()
+            .toISOString()
+            .replace(/[-:]/g, "")
+            .replace(/\.\d+Z$/, "Z");
           const file = new File(
-            chunks,
-            `jambuddy-live-audio-${new Date()
-              .toISOString()
-              .replace(/[-:]/g, "")
-              .replace(/\.\d+Z$/, "Z")}.webm`,
-            { type },
+            [wav ?? raw],
+            wav
+              ? `jambuddy-live-audio-${ts}.wav`
+              : `jambuddy-live-audio-${ts}.webm`,
+            { type: wav ? "audio/wav" : type },
           );
           resolve({
             file,
