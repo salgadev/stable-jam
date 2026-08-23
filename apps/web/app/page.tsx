@@ -186,6 +186,8 @@ export default function HomePage() {
   const [busy, setBusy] = useState(false);
   // Name of the demo chip currently loaded as the take (for active highlight).
   const [loadedDemo, setLoadedDemo] = useState<string | null>(null);
+  // Monotonic token so a slow demo fetch can't clobber a newer selection.
+  const demoLoadToken = useRef(0);
   // Generation backend. API (Stable Audio 3.0 Large) is default when the key is
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
@@ -246,24 +248,33 @@ export default function HomePage() {
    * comes from the source MIDI, so we set the knob to it rather than trusting
    * librosa's estimate of the MP3. */
   async function loadDemo(name: string, demoBpm: number) {
+    // Select immediately (single-select) + pin the knob, so the UI responds
+    // instantly instead of waiting on the slow fetch/detect below.
+    const token = ++demoLoadToken.current;
+    setLoadedDemo(name);
+    setBpm(demoBpm);
     setStatus(`Loading demo "${name}"…`);
     try {
       const res = await fetch(`/demos/${name}.mp3`);
       if (!res.ok) throw new Error(`fetch ${name}.mp3 -> ${res.status}`);
       const blob = await res.blob();
       const file = new File([blob], `${name}.mp3`, { type: "audio/mpeg" });
-      // Load it as an audio take, then pin the knob to the demo's real tempo.
-      await handleTakeFile(file);
-      setBpm(demoBpm);
-      setLoadedDemo(name);
+      // Ignore a stale load if the user has since picked a different demo.
+      if (token !== demoLoadToken.current) return;
+      // Load it as an audio take; knownBpm skips the slow server detect.
+      await handleTakeFile(file, demoBpm);
       setStatus(`Loaded demo "${name}" @ ${demoBpm} BPM.`);
     } catch (e) {
-      setStatus(`Couldn't load demo: ${String(e)}`);
+      if (token === demoLoadToken.current) {
+        setStatus(`Couldn't load demo: ${String(e)}`);
+      }
     }
   }
 
-  /** Handle a single uploaded take (MIDI or audio), auto-detecting the type. */
-  async function handleTakeFile(f: File | null) {
+  /** Handle a single uploaded take (MIDI or audio), auto-detecting the type.
+   * `knownBpm` (optional) skips the slow server detect and pins the knob to a
+   * caller-supplied tempo — used by demo chips, which already know their BPM. */
+  async function handleTakeFile(f: File | null, knownBpm?: number) {
     // One upload slot for either kind; picking a new file clears the old take.
     setMidiFile(null);
     setMidiBytes(null);
@@ -288,7 +299,11 @@ export default function HomePage() {
       }
       // Pre-fill the tempo knob from the take's tempo map (Option A: detect
       // first, knob stays authoritative + editable).
-      await prefillTempo(f, "midi");
+      if (knownBpm !== undefined) {
+        setBpm(knownBpm);
+      } else {
+        await prefillTempo(f, "midi");
+      }
       setStatus(
         `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
@@ -298,7 +313,11 @@ export default function HomePage() {
       // Audio is heard by the buddy (audio-to-audio). Clear the MIDI-driven
       // input-instrument default so the user's declaration reflects the audio.
       setInputInstrument("other");
-      await prefillTempo(f, "audio");
+      if (knownBpm !== undefined) {
+        setBpm(knownBpm);
+      } else {
+        await prefillTempo(f, "audio");
+      }
       setStatus(
         `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
