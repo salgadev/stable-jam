@@ -79,9 +79,14 @@ export async function POST(req: NextRequest) {
   // Thread the TS-built AudioSparx prompt through so Genre:/Moods:/Instruments
   // tags actually reach SA3. The Python CLI also accepts --instrument/--genre
   // for standalone use, but route.ts is authoritative here.
+  // Resolve the Python interpreter. Prefer JAM_BUDDY_PYTHON (set in the HF
+  // Space container to /usr/bin/python3); fall back to the local SA3 venv;
+  // finally to `python3` on PATH (container / CI). The venv path is Windows
+  // and won't exist in the Linux Space, so the fallback matters.
+  const venvPython = join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe");
   const python =
     process.env.JAM_BUDDY_PYTHON ??
-    join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe");
+    (exists(venvPython) ? venvPython : "python3");
 
   // Local = Stable Audio small models on CPU (supports negative prompt, free,
   // slow). API = Stable Audio 3.0 Large via Stability REST (no negative prompt,

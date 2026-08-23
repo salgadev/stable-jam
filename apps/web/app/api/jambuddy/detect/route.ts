@@ -52,7 +52,9 @@ export async function POST(req: NextRequest) {
   }
   const python =
     process.env.JAM_BUDDY_PYTHON ??
-    join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe");
+    (exists(join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe"))
+      ? join(repoRoot, "stable-audio-3", ".venv", "Scripts", "python.exe")
+      : "python3");
   const script = join(repoRoot, "tools", "jam_buddy_api.py");
 
   try {
