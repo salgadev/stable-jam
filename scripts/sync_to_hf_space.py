@@ -10,7 +10,7 @@ except ImportError:
     print("Error: huggingface_hub not installed. Run: pip install huggingface_hub")
     sys.exit(1)
 
-REPO_ID = "build-small-hackathon/stable-jam"
+REPO_ID = "salgadev/jam-buddy"
 REPO_TYPE = "space"
 
 
