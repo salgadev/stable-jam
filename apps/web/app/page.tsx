@@ -625,12 +625,13 @@ export default function HomePage() {
           <button
             type="button"
             onClick={playBoth}
-            disabled={!audioUrl || isPlayingTogether}
+            disabled={!audioUrl}
+            aria-pressed={isPlayingTogether}
             className="jambuddy-padbig flex-1"
             style={{ ["--pad-c" as string]: "#5fd38a" }}
           >
             <span className="jambuddy-padbig__label">
-              {isPlayingTogether ? "PLAYING…" : "PLAY TOGETHER"}
+              {isPlayingTogether ? "■ STOP" : "PLAY TOGETHER"}
             </span>
           </button>
         </div>
