@@ -1,8 +1,8 @@
 ---
 title: Jam Buddy
 emoji: 🎸
-colorFrom: orange
-colorTo: red
+colorFrom: red
+colorTo: purple
 sdk: docker
 app_port: 7860
 pinned: false
