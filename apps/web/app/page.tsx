@@ -29,7 +29,7 @@ import {
   type AudioInput,
   type MidiInput,
 } from "@/lib/jambuddy/recorder";
-import { Visualizer } from "@/lib/jambuddy/visualizer";
+import { Visualizer, type VisualizerHandle } from "@/lib/jambuddy/visualizer";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -467,6 +467,17 @@ export default function HomePage() {
    * click can read a stale `false` and start a SECOND simultaneous layer. Keep
    * a synchronous ref so the toggle is atomic. */
   const playbackRef = useRef<{ stop: () => void } | null>(null);
+  // Refs to the take + response visualizers so PLAY TOGETHER / other toggles
+  // can stop their audio (enforces one playback at a time).
+  const takeVisualizerRef = useRef<VisualizerHandle>(null);
+  const responseVisualizerRef = useRef<VisualizerHandle>(null);
+
+  // Central authority: stop every waveform toggle before any new playback
+  // starts, so the same audio never plays in two places at once.
+  const stopAllWaveformPlayback = () => {
+    takeVisualizerRef.current?.stop();
+    responseVisualizerRef.current?.stop();
+  };
   async function playBoth() {
     if (playbackRef.current) {
       // Stop: kill current playback (synchronous — immune to stale state).
@@ -480,6 +491,9 @@ export default function HomePage() {
       setStatus("Generate a response first.");
       return;
     }
+    // Stop any single-waveform playback so the same audio isn't heard twice
+    // while PLAY TOGETHER runs.
+    stopAllWaveformPlayback();
     playbackRef.current = { stop: () => {} }; // claim the toggle synchronously
     setIsPlayingTogether(true);
     setStatus("Playing your take + the buddy together…");
@@ -961,9 +975,11 @@ export default function HomePage() {
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <Visualizer
+                    ref={takeVisualizerRef}
                     audioUrl={takeAudioUrl}
                     label="Your take (audio waveform)"
                     playable
+                    onStartPlayback={stopAllWaveformPlayback}
                   />
                 </div>
               </div>
@@ -972,9 +988,11 @@ export default function HomePage() {
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <Visualizer
+                    ref={responseVisualizerRef}
                     audioUrl={audioUrl}
                     label="Buddy response (waveform)"
                     playable
+                    onStartPlayback={stopAllWaveformPlayback}
                   />
                 </div>
                 <button
