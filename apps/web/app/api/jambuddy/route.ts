@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
 
   const { prompt, negativePrompt } = buildPrompt(body.knobs);
   const bpm = body.bpm ?? 120;
-  const duration = body.duration ?? 30;
   // Drums use small-sfx (clean isolated hits); everything else small-music.
   const model = MODEL_FOR_INSTRUMENT[body.knobs.instrument];
 
@@ -105,10 +104,27 @@ export async function POST(req: NextRequest) {
   const sourceTag = body.midi ? "midi" : body.audio ? "audio" : "manual";
   // API returns MP3 (output_format mp3); local returns WAV.
   const ext = mode === "api" ? "mp3" : "wav";
-  const outPath = join(
-    generationsDir,
-    `${stamp}-${body.knobs.instrument}-${sourceTag}-${mode}.${ext}`,
-  );
+  // Descriptive filename: the knob values + input type + engine, sanitized so
+  // you can tell generations apart without opening them.
+  const slug = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const knobBpmSlug = slug(String(body.knobs.bpm));
+  const outName =
+    [
+      stamp,
+      slug(body.knobs.instrument),
+      slug(body.knobs.genre),
+      slug(body.knobs.mood),
+      body.knobs.inputInstrument && body.knobs.inputInstrument !== "other"
+        ? `over-${slug(body.knobs.inputInstrument)}`
+        : null,
+      knobBpmSlug ? `${knobBpmSlug}bpm` : null,
+      sourceTag,
+      mode,
+    ]
+      .filter(Boolean)
+      .join("-") + `.${ext}`;
+  const outPath = join(generationsDir, outName);
 
   try {
     // Build args. Option A: the knob BPM is authoritative and ALWAYS sent. The
@@ -150,8 +166,11 @@ export async function POST(req: NextRequest) {
       args.push("--genre", body.knobs.genre);
       console.log(`[jambuddy] audio take: audio-to-audio; tempo = ${knobBpm}`);
     } else {
-      // No take: knob BPM + explicit duration.
-      args.push("--duration", String(duration));
+      // No take: 4 bars in 4/4 = 16 beats at the knob tempo.
+      // seconds = beats * (60 / bpm) = 16 * 60 / bpm = 960 / bpm.
+      const bars4 = 960 / knobBpm;
+      args.push("--duration", String(Math.max(1, bars4)));
+      console.log(`[jambuddy] no take: 4 bars = ${bars4.toFixed(2)}s @ ${knobBpm} BPM`);
     }
 
     const t0 = Date.now();

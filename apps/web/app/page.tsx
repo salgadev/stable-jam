@@ -42,6 +42,7 @@ function Knob({
   onChange,
   format = (v: number) => String(v),
   disabled = false,
+  editable = false,
 }: {
   label: string;
   value: number;
@@ -51,6 +52,8 @@ function Knob({
   onChange: (v: number) => void;
   format?: (v: number) => string;
   disabled?: boolean;
+  /** Render the readout as a typeable number input (e.g. exact tempo). */
+  editable?: boolean;
 }) {
   const pct = ((value - min) / (max - min)) * 100;
   // --knob-rot is an actual angle (degrees), NOT a percentage. CSS can't do
@@ -74,9 +77,26 @@ function Knob({
         className="jambuddy-knob"
         style={{ ["--knob-rot" as string]: rot }}
       />
-      <span className="font-mono text-sm font-bold text-[#e8e8f0]">
-        {disabled ? "from take" : format(value)}
-      </span>
+      {editable ? (
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step ?? 1}
+          value={value}
+          aria-label={`${label} value`}
+          disabled={disabled}
+          onChange={(e) => {
+            const v = e.target.value === "" ? min : Number(e.target.value);
+            onChange(Math.min(max, Math.max(min, v)));
+          }}
+          className="w-16 rounded border border-[#2a2d3d] bg-[#12131b] px-1 text-center font-mono text-sm font-bold text-[#e8e8f0]"
+        />
+      ) : (
+        <span className="font-mono text-sm font-bold text-[#e8e8f0]">
+          {disabled ? "from take" : format(value)}
+        </span>
+      )}
     </label>
   );
 }
@@ -356,6 +376,7 @@ export default function HomePage() {
             step={1}
             onChange={setBpm}
             format={(v) => `${v} BPM`}
+            editable
           />
         </section>
 
