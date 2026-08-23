@@ -1,3 +1,14 @@
+---
+title: Jam Buddy
+emoji: 🎸
+colorFrom: orange
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: You start playing, it joins in — an AI music companion.
+---
+
 # Jam Buddy
 
 > An AI music companion that listens to what you play and joins in — at your

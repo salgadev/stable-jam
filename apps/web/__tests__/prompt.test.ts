@@ -54,13 +54,13 @@ describe("buildPrompt", () => {
     expect(negativePrompt).toContain("drums");
   });
 
-  it("does not negate the buddy's own instrument family in the negative prompt (lead guitar + input guitar)", () => {
+  it("does not negate the buddy's own instrument family in the negative prompt (guitar + input guitar)", () => {
     const { negativePrompt } = buildPrompt({
       ...base,
-      instrument: "lead",
+      instrument: "guitar",
       inputInstrument: "guitar",
     });
-    // buddy=lead is in the guitar family; adding "guitar" to the negative
+    // buddy=guitar is in the guitar family; adding "guitar" to the negative
     // would steer SA3 away from the buddy itself, so we must NOT add it.
     expect(negativePrompt).not.toContain("guitar");
   });

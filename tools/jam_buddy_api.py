@@ -37,14 +37,12 @@ CREDITS_PER_GEN = 26
 
 # Instrument -> AudioSparx `Instruments:` tag fragment (matches jam_buddy.py)
 INSTRUMENTS = {
+    "guitar": "Guitar, a tight electric guitar riff",
     "bass": "Bass Guitar, a grooving bass line, tight and in the pocket",
-    "lead": "Lead Guitar, a soaring melodic lead guitar riff",
-    "rhythm": "Rhythm Guitar, tight palm-muted power chords",
-    "synth": "Synth, a warm atmospheric pad",
     "drums": "Drums, a punchy drum groove, kick and snare locked in",
+    "synth": "Synth, a warm atmospheric pad",
+    "piano": "Piano, a melodic piano part",
     "sax": "Saxophone, a warm breathy saxophone line with a rich tone",
-    "cleanguitar": "Clean Guitar, bright chimey clean electric guitar arpeggios",
-    "overdrivenguitar": "Overdriven Guitar, a gritty overdriven guitar riff with crunch",
 }
 DEFAULT_GENRE = "any"
 GENRE_TEMPO = {

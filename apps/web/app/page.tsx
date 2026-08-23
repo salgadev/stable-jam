@@ -396,31 +396,19 @@ export default function HomePage() {
           </span>
         </header>
 
-        {/* Instrument / trigger pads */}
-        <section aria-labelledby="pads-label" className="mb-6">
-          <h2
-            id="pads-label"
-            className="mb-2 font-mono text-[10px] uppercase tracking-widest text-[#7f829c]"
-          >
-            Instrument
-          </h2>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-            {INSTRUMENTS.map((inst) => (
-              <Pad
-                key={inst}
-                label={INSTRUMENT_LABELS[inst]}
-                selected={instrument === inst}
-                onSelect={() => setInstrument(inst)}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Knob row */}
+        {/* Knob row — all 4 knobs on one row */}
         <section
           aria-label="Style controls"
-          className="mb-6 grid grid-cols-3 gap-4 rounded-xl bg-[#15161f] p-4"
+          className="mb-6 grid grid-cols-4 gap-4 rounded-xl bg-[#15161f] p-4"
         >
+          <Knob
+            label="Instrument"
+            value={INSTRUMENTS.indexOf(instrument)}
+            min={0}
+            max={INSTRUMENTS.length - 1}
+            onChange={(v) => setInstrument(INSTRUMENTS[v] ?? "guitar")}
+            format={(v) => INSTRUMENT_LABELS[INSTRUMENTS[v] ?? "guitar"] ?? ""}
+          />
           <Knob
             label="Genre"
             value={GENRES.indexOf(genre)}

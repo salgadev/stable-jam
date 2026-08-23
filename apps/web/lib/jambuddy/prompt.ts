@@ -19,14 +19,12 @@
  */
 
 export type BuddyInstrument =
+  | "guitar"
   | "bass"
-  | "lead"
-  | "rhythm"
-  | "synth"
   | "drums"
-  | "sax"
-  | "cleanguitar"
-  | "overdrivenguitar";
+  | "synth"
+  | "piano"
+  | "sax";
 
 /**
  * What the user IS playing on their take. SA3 has no MIR — it cannot read the
@@ -62,14 +60,12 @@ export type BuddyMood =
 
 /** Instrument → AudioSparx `Instruments:` tag fragment (the "knob" options). */
 export const INSTRUMENT_PROMPTS: Readonly<Record<BuddyInstrument, string>> = {
+  guitar: "Guitar, a tight electric guitar riff",
   bass: "Bass Guitar, a grooving bass line, tight and in the pocket",
-  lead: "Lead Guitar, a soaring melodic lead guitar riff",
-  rhythm: "Rhythm Guitar, tight palm-muted power chords",
-  synth: "Synth, a warm atmospheric pad",
   drums: "Drums, a punchy drum groove, kick and snare locked in",
+  synth: "Synth, a warm atmospheric pad",
+  piano: "Piano, a melodic piano part",
   sax: "Saxophone, a warm breathy saxophone line with a rich tone",
-  cleanguitar: "Clean Guitar, bright chimey clean electric guitar arpeggios",
-  overdrivenguitar: "Overdriven Guitar, a gritty overdriven guitar riff with crunch",
 };
 
 /** Genre → AudioSparx `Genre:` tag. Matches the model's training vocab. */
@@ -107,14 +103,12 @@ const BASE_NEGATIVES: readonly string[] = [
  * for musical phrases.
  */
 export const MODEL_FOR_INSTRUMENT: Readonly<Record<BuddyInstrument, string>> = {
+  guitar: "small-music",
   bass: "small-music",
-  lead: "small-music",
-  rhythm: "small-music",
-  synth: "small-music",
   drums: "small-sfx",
+  synth: "small-music",
+  piano: "small-music",
   sax: "small-music",
-  cleanguitar: "small-music",
-  overdrivenguitar: "small-music",
 };
 
 export interface BuddyKnobs {
@@ -201,28 +195,24 @@ function buddyInstrumentFamilyMatches(
   inputNoun: string,
 ): boolean {
   const family: Readonly<Record<BuddyInstrument, string>> = {
+    guitar: "guitar",
     bass: "bass",
-    lead: "guitar",
-    rhythm: "guitar",
-    synth: "synth",
     drums: "drums",
+    synth: "synth",
+    piano: "piano",
     sax: "sax",
-    cleanguitar: "guitar",
-    overdrivenguitar: "guitar",
   };
   return family[instrument] === inputNoun;
 }
 
 /** The knob options, for rendering dropdowns. */
 export const INSTRUMENTS: readonly BuddyInstrument[] = [
+  "guitar",
   "bass",
-  "lead",
-  "rhythm",
-  "synth",
   "drums",
+  "synth",
+  "piano",
   "sax",
-  "cleanguitar",
-  "overdrivenguitar",
 ];
 /** Input-instrument vocab (what the user is playing on the take). */
 export const INPUT_INSTRUMENTS: readonly InputInstrument[] = [
@@ -281,7 +271,6 @@ export const MOOD_LABELS: Readonly<Record<BuddyMood, string>> = {
 };
 /** Human-friendly labels for the buddy-instrument pads. */
 export const INSTRUMENT_LABELS: Readonly<Record<BuddyInstrument, string>> = {
-  bass: "Bass", lead: "Lead Guitar", rhythm: "Rhythm Guitar", synth: "Synth",
-  drums: "Drums", sax: "Sax", cleanguitar: "Clean Guitar",
-  overdrivenguitar: "Overdriven Guitar",
+  guitar: "Guitar", bass: "Bass", drums: "Drums", synth: "Synth",
+  piano: "Piano", sax: "Sax",
 };
