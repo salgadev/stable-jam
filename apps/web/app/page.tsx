@@ -16,7 +16,7 @@ import {
   type BuddyMood,
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
-import { parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
+import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether } from "@/lib/jambuddy/player";
 import { createMidiRecorder, recordedNotesAsFile, type MidiRecorder } from "@/lib/jambuddy/recorder";
 import { Visualizer } from "@/lib/jambuddy/visualizer";
 
@@ -134,8 +134,11 @@ export default function HomePage() {
   const [midiFile, setMidiFile] = useState<File | null>(null);
   const [midiBytes, setMidiBytes] = useState<ArrayBuffer | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  // Object URL of the uploaded audio take (for playback + waveform).
+  const [takeAudioUrl, setTakeAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Ready.");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlayingTogether, setIsPlayingTogether] = useState(false);
   const [usedBpm, setUsedBpm] = useState<number | null>(null);
   const [usedSeconds, setUsedSeconds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -191,6 +194,8 @@ export default function HomePage() {
     setMidiFile(null);
     setMidiBytes(null);
     setAudioFile(null);
+    if (takeAudioUrl) URL.revokeObjectURL(takeAudioUrl);
+    setTakeAudioUrl(null);
     if (!f) {
       setStatus("Ready.");
       return;
@@ -215,6 +220,7 @@ export default function HomePage() {
       );
     } else {
       setAudioFile(f);
+      setTakeAudioUrl(URL.createObjectURL(f));
       // Audio is heard by the buddy (audio-to-audio). Clear the MIDI-driven
       // input-instrument default so the user's declaration reflects the audio.
       setInputInstrument("other");
@@ -308,6 +314,53 @@ export default function HomePage() {
     a.click();
     document.body.removeChild(a);
     setStatus("Saved your recorded MIDI take.");
+  }
+
+  /** Download the generated buddy response (audio) as a file. */
+  function saveGeneratedAudio() {
+    if (!audioUrl) {
+      setStatus("Generate a response first, then save it.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = audioUrl;
+    a.download = `jambuddy-response-${new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d+Z$/, "Z")}.${mode === "api" ? "mp3" : "wav"}`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setStatus("Saved the buddy's response.");
+  }
+
+  /** Play the take and the buddy response together (audio mix, or MIDI synth). */
+  async function playBoth() {
+    if (!audioUrl) {
+      setStatus("Generate a response first.");
+      return;
+    }
+    setIsPlayingTogether(true);
+    setStatus("Playing your take + the buddy together…");
+    try {
+      if (midiBytes) {
+        // MIDI take: render with the built-in synth, layered with the buddy.
+        const { done } = await playTogether(midiBytes, audioUrl);
+        await done;
+      } else if (takeAudioUrl) {
+        // Audio take: mix the two audio files on the same clock.
+        const { done } = await playAudioTogether(takeAudioUrl, audioUrl);
+        await done;
+      } else {
+        setStatus("Load a take first to play it with the response.");
+      }
+      setStatus("Done — both played together.");
+    } catch (e) {
+      setStatus(`Playback error: ${String(e)}`);
+    } finally {
+      setIsPlayingTogether(false);
+    }
   }
 
   async function joinIn() {
@@ -547,11 +600,35 @@ export default function HomePage() {
           </button>
           <button
             type="button"
+            onClick={saveGeneratedAudio}
+            disabled={!audioUrl || busy}
+            className="jambuddy-trigger flex-1"
+            style={{
+              background: "linear-gradient(180deg,#5fd38a 0%,#3aa55f 100%)",
+              boxShadow: "0 2px 0 #256b3f",
+            }}
+          >
+            SAVE AUDIO
+          </button>
+          <button
+            type="button"
             onClick={joinIn}
             disabled={busy}
             className="jambuddy-trigger flex-1"
           >
             {busy ? "PRODUCING…" : "JOIN IN"}
+          </button>
+          <button
+            type="button"
+            onClick={playBoth}
+            disabled={!audioUrl || isPlayingTogether}
+            className="jambuddy-trigger flex-1"
+            style={{
+              background: "linear-gradient(180deg,#f4a261 0%,#e07b3a 100%)",
+              boxShadow: "0 2px 0 #a85a24",
+            }}
+          >
+            {isPlayingTogether ? "PLAYING…" : "PLAY TOGETHER"}
           </button>
           <div className="font-mono text-xs text-[#7f829c]">
             <div className="uppercase tracking-widest">Prompt</div>
@@ -594,20 +671,29 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Take + response visualizers */}
-        {(midiBytes || audioUrl) && (
+        {/* Take + response visualizers — stacked vertically, DAW-style */}
+        {(midiBytes || takeAudioUrl || audioUrl) && (
           <section
             aria-label="Take and response"
-            className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
+            className="mt-4 flex flex-col gap-4"
           >
-            <Visualizer
-              midiBytes={midiBytes}
-              label="Your take (MIDI piano-roll)"
-            />
-            <Visualizer
-              audioUrl={audioUrl}
-              label="Buddy response (waveform)"
-            />
+            {midiBytes ? (
+              <Visualizer
+                midiBytes={midiBytes}
+                label="Your take (MIDI piano-roll)"
+              />
+            ) : takeAudioUrl ? (
+              <Visualizer
+                audioUrl={takeAudioUrl}
+                label="Your take (audio waveform)"
+              />
+            ) : null}
+            {audioUrl && (
+              <Visualizer
+                audioUrl={audioUrl}
+                label="Buddy response (waveform)"
+              />
+            )}
           </section>
         )}
       </div>
