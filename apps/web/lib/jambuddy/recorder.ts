@@ -81,15 +81,35 @@ export function recordedNotesAsFile(
   );
 }
 
+/** A MIDI input port (device) the user can select. */
+export interface MidiInput {
+  id: string;
+  name: string;
+}
+
+/** List connected MIDI input devices (ports). */
+export async function listMidiInputs(): Promise<MidiInput[]> {
+  if (typeof navigator === "undefined" || !("requestMIDIAccess" in navigator)) {
+    return [];
+  }
+  const access = await navigator.requestMIDIAccess();
+  return [...access.inputs.values()].map((i) => ({
+    id: i.id,
+    name: i.name || "MIDI controller",
+  }));
+}
+
 /**
  * Create a recorder bound to a MIDI input. Requests MIDI access (user gesture
  * required in some browsers). Returns a started recorder + the chosen input.
  *
- * If `preferredDeviceName` is given, use that input; otherwise the first
- * available. Throws if Web MIDI is unsupported or no input is available.
+ * `preferredDeviceId` selects the input port (from listMidiInputs). `channel`
+ * (0-15) filters to a single GM channel; `undefined` records all channels.
+ * Falls back to the first available input if the preferred device is gone.
  */
 export async function createMidiRecorder(
-  preferredDeviceName?: string,
+  preferredDeviceId?: string,
+  channel?: number,
 ): Promise<MidiRecorder> {
   if (typeof navigator === "undefined" || !("requestMIDIAccess" in navigator)) {
     throw new Error("Web MIDI is not supported in this browser (try Chrome/Edge).");
@@ -101,7 +121,7 @@ export async function createMidiRecorder(
     throw new Error("No MIDI input device found. Connect a controller.");
   }
   const input =
-    inputs.find((i) => i.name === preferredDeviceName) ??
+    inputs.find((i) => i.id === preferredDeviceId) ??
     inputs[0] ??
     null;
   if (!input) {
@@ -119,13 +139,15 @@ export async function createMidiRecorder(
     const vel = e.data[2];
     if (status === undefined || midi === undefined || vel === undefined) return;
     const cmd = status & 0xf0;
-    const channel = status & 0x0f;
+    const msgChannel = status & 0x0f;
+    // If a channel filter is set, ignore messages on other channels.
+    if (channel !== undefined && msgChannel !== channel) return;
     if (cmd === 0x90 && vel > 0) {
       notes.push({
         time: (performance.now() - startTime) / 1000,
         midi,
         velocity: vel,
-        channel,
+        channel: msgChannel,
       });
     }
   };
@@ -180,10 +202,11 @@ export interface AudioInput {
 }
 
 /**
- * List available audio input devices (mics / interfaces). Returns the actual
- * deviceId + label for each `audioinput`. Labels are only populated once mic
- * permission has been granted; before that, devices appear as "Mic …" without
- * a usable label, so call this after a getUserMedia() grant.
+ * List available audio input devices (mics / interfaces). Must be called AFTER
+ * mic permission is granted (getUserMedia), otherwise labels are blank and the
+ * list is incomplete. The browser exposes a `default` pseudo-device alongside
+ * the real devices — we keep it as its own entry (labelled "Default"), but the
+ * real per-device entries are what the user picks from.
  */
 export async function listAudioInputs(): Promise<AudioInput[]> {
   if (
@@ -194,14 +217,25 @@ export async function listAudioInputs(): Promise<AudioInput[]> {
   }
   const devices = await navigator.mediaDevices.enumerateDevices();
   const audioInputs = devices.filter((d) => d.kind === "audioinput");
-  const defaultId =
-    devices.find((d) => d.kind === "audioinput" && d.deviceId === "default")
-      ?.deviceId ?? null;
   return audioInputs.map((d) => ({
     deviceId: d.deviceId,
-    label: d.label || "Default microphone",
-    isDefault: defaultId !== null && d.deviceId === defaultId,
+    label: d.label || (d.deviceId === "default" ? "Default microphone" : "Mic"),
+    isDefault: d.deviceId === "default",
   }));
+}
+
+/**
+ * Grant mic permission (a user gesture) and return the live stream. The caller
+ * stops the tracks if it only wanted permission (to enumerate devices).
+ */
+export async function grantMicPermission(): Promise<MediaStream> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getUserMedia
+  ) {
+    throw new Error("getUserMedia is not supported in this browser.");
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: true });
 }
 
 /**

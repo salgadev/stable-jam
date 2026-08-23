@@ -21,10 +21,13 @@ import {
   createMidiRecorder,
   createAudioRecorder,
   listAudioInputs,
+  listMidiInputs,
+  grantMicPermission,
   recordedNotesAsFile,
   type MidiRecorder,
   type AudioRecorder,
   type AudioInput,
+  type MidiInput,
 } from "@/lib/jambuddy/recorder";
 import { Visualizer } from "@/lib/jambuddy/visualizer";
 
@@ -163,6 +166,10 @@ export default function HomePage() {
   // Audio input devices for the source dropdown (populated once mic is allowed).
   const [audioInputs, setAudioInputs] = useState<AudioInput[]>([]);
   const [audioDeviceId, setAudioDeviceId] = useState<string | null>(null);
+  // MIDI input devices + optional channel filter for the source dropdown.
+  const [midiInputs, setMidiInputs] = useState<MidiInput[]>([]);
+  const [midiDeviceId, setMidiDeviceId] = useState<string | null>(null);
+  const [midiChannel, setMidiChannel] = useState<number | null>(null);
   // Object URL of the last recorded MIDI take (for save + piano-roll).
   const [recordedMidiUrl, setRecordedMidiUrl] = useState<string | null>(null);
 
@@ -315,7 +322,18 @@ export default function HomePage() {
     if (recordSource === "midi") {
       setStatus("Connecting to MIDI controller…");
       try {
-        const rec = await createMidiRecorder();
+        // Populate the MIDI device list on first record (port enumeration).
+        if (midiInputs.length === 0) {
+          const devices = await listMidiInputs();
+          setMidiInputs(devices);
+          if (!midiDeviceId) {
+            setMidiDeviceId(devices[0]?.id ?? null);
+          }
+        }
+        const rec = await createMidiRecorder(
+          midiDeviceId ?? undefined,
+          midiChannel ?? undefined,
+        );
         recRef.current = rec;
         rec.start();
         setRecording(true);
@@ -326,19 +344,18 @@ export default function HomePage() {
     } else {
       setStatus("Requesting microphone access…");
       try {
-        // Populate the device list on first audio record (labels need a grant).
+        // Grant permission FIRST (a user gesture) so enumerateDevices returns
+        // real labels + all devices. On first click the list is empty; after
+        // the grant we populate it before starting to record.
         if (audioInputs.length === 0) {
-          listAudioInputs()
-            .then((devices) => {
-              setAudioInputs(devices);
-              const first = devices[0];
-              if (devices.length > 0 && first && !audioDeviceId) {
-                setAudioDeviceId(first.deviceId);
-              }
-            })
-            .catch(() => {
-              /* list is best-effort; default mic still works */
-            });
+          const permStream = await grantMicPermission();
+          permStream.getTracks().forEach((t) => t.stop());
+          const devices = await listAudioInputs();
+          setAudioInputs(devices);
+          if (!audioDeviceId) {
+            const defaultDev = devices.find((d) => d.isDefault);
+            setAudioDeviceId(defaultDev?.deviceId ?? devices[0]?.deviceId ?? null);
+          }
         }
         const rec = await createAudioRecorder(audioDeviceId ?? undefined);
         recRef.current = rec;
@@ -708,6 +725,49 @@ export default function HomePage() {
                 ))}
               </select>
             </label>
+          )}
+          {recordSource === "midi" && midiInputs.length > 0 && (
+            <>
+              <label className="flex items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+                  Device
+                </span>
+                <select
+                  value={midiDeviceId ?? ""}
+                  onChange={(e) => setMidiDeviceId(e.target.value || null)}
+                  aria-label="MIDI input device"
+                  className="rounded border border-[#2a2d3d] bg-[#12131b] px-2 py-1 text-xs text-[#e8e8f0]"
+                >
+                  {midiInputs.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+                  Channel
+                </span>
+                <select
+                  value={midiChannel === null ? "" : String(midiChannel)}
+                  onChange={(e) =>
+                    setMidiChannel(
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                  aria-label="MIDI channel"
+                  className="rounded border border-[#2a2d3d] bg-[#12131b] px-2 py-1 text-xs text-[#e8e8f0]"
+                >
+                  <option value="">All</option>
+                  {Array.from({ length: 16 }, (_, i) => (
+                    <option key={i} value={String(i)}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           )}
         </div>
         {/* Transport — sampler/sequencer pads */}

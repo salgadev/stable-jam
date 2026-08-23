@@ -30,6 +30,13 @@ vi.mock("@/lib/jambuddy/recorder", () => ({
     isActive: vi.fn(() => false),
     dispose: vi.fn(),
   })),
+  listMidiInputs: vi.fn(async () => [
+    { id: "mpk", name: "MPK Mini" },
+    { id: "keystation", name: "Keystation 49" },
+  ]),
+  grantMicPermission: vi.fn(async () => ({
+    getTracks: () => [{ stop: vi.fn() }],
+  })),
   createAudioRecorder: vi.fn(async () => ({
     start: vi.fn(),
     stop: vi.fn(async () => ({
@@ -196,5 +203,30 @@ describe("RECORD source toggle", () => {
     );
     expect(options).toContain("Default microphone");
     expect(options).toContain("USB Audio Interface");
+  });
+
+  it("shows the MIDI device + channel dropdowns once MIDI recording starts", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Start MIDI recording so listMidiInputs populates devices (source
+    // defaults to MIDI, so just hit RECORD).
+    await user.click(screen.getByRole("button", { name: "Record from MIDI controller" }));
+
+    // Device dropdown lists the two mocked MIDI controllers.
+    const deviceSelect = await screen.findByRole("combobox", {
+      name: "MIDI input device",
+    });
+    const deviceOptions = Array.from(deviceSelect.querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(deviceOptions).toContain("MPK Mini");
+    expect(deviceOptions).toContain("Keystation 49");
+
+    // Channel dropdown defaults to "All" with 16 selectable channels.
+    const channelSelect = screen.getByRole("combobox", { name: "MIDI channel" });
+    const channelOptions = Array.from(channelSelect.querySelectorAll("option"));
+    expect(channelOptions[0]?.textContent).toBe("All");
+    expect(channelOptions.length).toBe(17); // All + 16
   });
 });
