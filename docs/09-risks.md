@@ -341,10 +341,25 @@ away from extra instruments via a negative prompt — the positive prompt + `cfg
 + `strength` are the only levers. The local CPU fallback (`small-music`) DOES accept
 a negative prompt.
 
-### 3. Demo examples can't be played
+### 3. Demo examples can't be played — RESOLVED
 The clickable demo chips (Gradio-style) load MIDI as a take, but preview playback
 doesn't work — the MIDI examples need to render to audio to actually be audible
 as a "playable example." Consider pre-rendering the demo MIDIs to audio (or
 ensuring the Web-MIDI synth preview actually plays).
+
+**Resolved:** demos now load their pre-rendered MP3 as an audio take (with the
+BPM knob pinned to the source MIDI's tempo), and playback is a play/stop toggle
+on the waveform. Single-select + instant highlight/knob update.
+
+### 4. Stale `.next` cache corrupts the dev server (recurring) — OPEN
+`next dev`'s incremental cache corrupts after heavy edits. Symptoms: API routes
+500 (`MODULE_NOT_FOUND` in `webpack-runtime.js`) OR the page renders blank
+(every `/_next/static/chunk` 404s while `GET /` still returns 200). Often a
+leftover process squats on port 3000. Fix today: kill the port-3000 PID
+(`netstat -ano | grep :3000`, `taskkill /F /PID`), `rm -rf apps/web/.next`,
+restart `pnpm dev`, verify chunks load (not just `GET /`). **Address later** —
+candidate: a `dev:clean` npm script that clears `.next` before starting, or a
+more robust dev workflow.
+
 
 
