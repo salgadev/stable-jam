@@ -34,7 +34,7 @@ COPY --from=web-build /app/apps/web/node_modules apps/web/node_modules
 COPY --from=web-build /app/node_modules node_modules
 COPY --from=web-build /app/packages packages
 COPY apps/web/next.config.mjs apps/web/next.config.mjs
-COPY apps/web/public apps/web/public 2>/dev/null || true
+# No apps/web/public dir in this app — omit it (COPY can't use shell operators).
 COPY tools tools
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
