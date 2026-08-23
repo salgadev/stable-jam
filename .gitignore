@@ -93,3 +93,4 @@ generations/
 
 # SA3 engine — large venv + license-gated weights; regenerable, keep out of git
 stable-audio-3/
+toggle-switch.webp
