@@ -207,3 +207,73 @@ export function midiDuration(buf: ArrayBuffer): number {
     return 30;
   }
 }
+
+/**
+ * Play an AUDIO take and the buddy response TOGETHER (mixed on the same clock).
+ * This is the audio-take analogue of playTogether (which is MIDI + buddy).
+ * Both are decoded AudioBuffers scheduled to start at the same time.
+ *
+ * @param takeAudioUrl   the user's audio take (object URL)
+ * @param buddyAudioUrl  the generated response (object URL)
+ * @returns an object with stop() and a promise resolving when both finish.
+ */
+export async function playAudioTogether(
+  takeAudioUrl: string,
+  buddyAudioUrl: string,
+): Promise<{ stop: () => void; done: Promise<void> }> {
+  const ctx = new AudioContext();
+  await ctx.resume();
+
+  const decode = async (url: string) => {
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    return ctx.decodeAudioData(buf);
+  };
+
+  const [takeBuffer, buddyBuffer] = await Promise.all([
+    decode(takeAudioUrl),
+    decode(buddyAudioUrl),
+  ]);
+
+  const master = ctx.createGain();
+  master.gain.value = 0.8;
+  master.connect(ctx.destination);
+
+  const startAt = ctx.currentTime + 0.1;
+
+  const takeSrc = ctx.createBufferSource();
+  takeSrc.buffer = takeBuffer;
+  takeSrc.connect(master);
+  takeSrc.start(startAt);
+
+  const buddySrc = ctx.createBufferSource();
+  buddySrc.buffer = buddyBuffer;
+  buddySrc.connect(master);
+  buddySrc.start(startAt);
+
+  const end = startAt + Math.max(takeBuffer.duration, buddyBuffer.duration);
+
+  const done = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      try {
+        ctx.close();
+      } catch {
+        /* already closed */
+      }
+      resolve();
+    }, Math.max(0, (end - ctx.currentTime) * 1000) + 200);
+  });
+
+  return {
+    stop: () => {
+      try {
+        takeSrc.stop();
+        buddySrc.stop();
+        ctx.close();
+      } catch {
+        /* ignore */
+      }
+    },
+    done,
+  };
+}
