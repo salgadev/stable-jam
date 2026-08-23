@@ -239,12 +239,6 @@ export default function HomePage() {
     );
   }
 
-  /** Play a bundled demo's pre-rendered MP3 (audible preview). */
-  function playDemo(name: string) {
-    const a = new Audio(`/demos/${name}.mp3`);
-    a.play().catch(() => setStatus("Couldn't play demo (audio blocked?)."));
-  }
-
   /** Load a bundled demo as an audio take + set the tempo knob to its BPM.
    * The MP3 is what the buddy responds to (audio-to-audio); the exact tempo
    * comes from the source MIDI, so we set the knob to it rather than trusting
@@ -719,36 +713,22 @@ export default function HomePage() {
               {audioFile.name} — audio: buddy responds to its groove (audio-to-audio).
             </p>
           )}
-          {/* Gradio-style demo examples: click the name to load as a take, or
-              hit the ▶ to preview it solo through the synth. */}
+          {/* Gradio-style demo examples: click to load as a take. Playback is
+              on the take waveform (audio) below. */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
               Demos
             </span>
             {DEMO_MIDIS.map((d) => (
-              <div
+              <button
                 key={d.name}
-                className="flex items-center gap-1 rounded-full border border-[#2a2d3d] bg-[#1a1c28] py-1 pl-3 pr-1 text-xs"
+                type="button"
+                onClick={() => loadDemo(d.name, d.bpm)}
+                disabled={busy}
+                className="rounded-full border border-[#2a2d3d] bg-[#1a1c28] px-3 py-1 text-xs text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
               >
-                <button
-                  type="button"
-                  onClick={() => loadDemo(d.name, d.bpm)}
-                  disabled={busy}
-                  className="text-[#e8e8f0] hover:text-[#5fd38a]"
-                >
-                  {d.label}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playDemo(d.name)}
-                  disabled={busy}
-                  aria-label={`Play demo ${d.label}`}
-                  title="Preview"
-                  className="grid h-5 w-5 place-items-center rounded-full border border-[#2a2d3d] text-[10px] text-[#5fd38a] hover:bg-[#5fd38a] hover:text-[#12131b]"
-                >
-                  ▶
-                </button>
-              </div>
+                {d.label}
+              </button>
             ))}
           </div>
         </section>
@@ -988,6 +968,7 @@ export default function HomePage() {
                   <Visualizer
                     audioUrl={takeAudioUrl}
                     label="Your take (audio waveform)"
+                    playable
                   />
                 </div>
               </div>

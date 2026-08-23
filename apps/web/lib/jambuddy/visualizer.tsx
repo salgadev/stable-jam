@@ -12,7 +12,7 @@
  * you can compare the take and the response side by side.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseMidi, type ParsedNote } from "./player";
 
 interface VisualizerProps {
@@ -24,6 +24,8 @@ interface VisualizerProps {
   label?: string;
   /** Height of the canvas in px. */
   height?: number;
+  /** Show a play/stop toggle on the waveform (audio only). */
+  playable?: boolean;
 }
 
 const NOTE_MIN = 21; // A0
@@ -124,13 +126,22 @@ export function Visualizer({
   audioUrl,
   label,
   height = 120,
+  playable = false,
 }: VisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Play/stop state for the waveform toggle (audio only).
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
+    // reset play state whenever the audio changes
+    setPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     if (midiBytes) {
       let notes: ParsedNote[] = [];
       let duration = 0;
@@ -178,6 +189,29 @@ export function Visualizer({
     }
   }, [midiBytes, audioUrl]);
 
+  // Toggle play/stop of the waveform's audio (audio only).
+  const togglePlay = () => {
+    if (!audioUrl) return;
+    if (playing) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlaying(false);
+      return;
+    }
+    const a = new Audio(audioUrl);
+    a.onended = () => {
+      audioRef.current = null;
+      setPlaying(false);
+    };
+    audioRef.current = a;
+    a.play()
+      .then(() => setPlaying(true))
+      .catch(() => {
+        audioRef.current = null;
+        setPlaying(false);
+      });
+  };
+
   return (
     <div className="w-full">
       {label && (
@@ -185,11 +219,28 @@ export function Visualizer({
           {label}
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        className="w-full rounded border border-[#2a2d3d] bg-[#12131b]"
-        style={{ height }}
-      />
+      <div className="flex items-center gap-2">
+        {playable && audioUrl && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={playing ? "Stop playback" : "Play"}
+            title={playing ? "Stop" : "Play"}
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border text-sm ${
+              playing
+                ? "border-[#e05252] bg-[#e05252] text-[#12131b]"
+                : "border-[#2a2d3d] bg-[#1a1c28] text-[#5fd38a] hover:bg-[#5fd38a] hover:text-[#12131b]"
+            }`}
+          >
+            {playing ? "■" : "▶"}
+          </button>
+        )}
+        <canvas
+          ref={canvasRef}
+          className="w-full rounded border border-[#2a2d3d] bg-[#12131b]"
+          style={{ height }}
+        />
+      </div>
     </div>
   );
 }
