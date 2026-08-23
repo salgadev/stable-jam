@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   buildPrompt,
   GENRE_LABELS,
@@ -17,6 +17,7 @@ import {
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
 import { parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
+import { createMidiRecorder, recordedNotesAsFile, type MidiRecorder } from "@/lib/jambuddy/recorder";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -141,6 +142,10 @@ export default function HomePage() {
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
   const [mode, setMode] = useState<"api" | "local">("api");
+  // Live MIDI capture. recRef holds the active recorder; recording is a state
+  // so the big RED button reflects it.
+  const recRef = useRef<MidiRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
 
   const { prompt, negativePrompt } = buildPrompt({
     instrument,
@@ -239,6 +244,45 @@ export default function HomePage() {
       /* detection is best-effort; knob keeps its current value */
     }
     return null;
+  }
+
+  /** Toggle live MIDI capture. On stop, the take is written as a .mid file and
+   * fed through the normal take pipeline (tempo detect + duration + input). */
+  async function toggleRecord() {
+    if (recording) {
+      // Stop: convert recorded notes to a .mid File and treat as a MIDI take.
+      const rec = recRef.current;
+      if (rec) {
+        const { notes, durationSec } = rec.stop();
+        rec.dispose();
+        recRef.current = null;
+        setRecording(false);
+        if (notes.length === 0) {
+          setStatus("Recording stopped — no notes captured.");
+          return;
+        }
+        // Use the current knob BPM (or 120) for the tempo map of the .mid.
+        const file = recordedNotesAsFile(notes, bpm || 120);
+        setStatus(
+          `Captured ${notes.length} notes (${durationSec.toFixed(1)}s). Detecting tempo…`,
+        );
+        await handleTakeFile(file);
+      } else {
+        setRecording(false);
+      }
+      return;
+    }
+    // Start: create the recorder + begin listening.
+    setStatus("Connecting to MIDI controller…");
+    try {
+      const rec = await createMidiRecorder();
+      recRef.current = rec;
+      rec.start();
+      setRecording(true);
+      setStatus("● RECORDING — play your take, then press stop.");
+    } catch (e) {
+      setStatus(`MIDI record unavailable: ${String(e)}`);
+    }
   }
 
   async function joinIn() {
@@ -453,9 +497,10 @@ export default function HomePage() {
               checked={mode === "api"}
               onChange={(e) => setMode(e.target.checked ? "api" : "local")}
             />
-            <span className="engine-toggle__track">
-              <span className="engine-toggle__opt engine-toggle__opt--api">API</span>
-              <span className="engine-toggle__opt engine-toggle__opt--local">Local</span>
+            <span className="engine-toggle__switch">
+              <span className="engine-toggle__label engine-toggle__label--api">API</span>
+              <span className="engine-toggle__lever" aria-hidden="true" />
+              <span className="engine-toggle__label engine-toggle__label--local">Local</span>
             </span>
           </label>
           <span className="font-mono text-[10px] text-[#7f829c]">
@@ -465,6 +510,16 @@ export default function HomePage() {
           </span>
         </div>
         <div className="mb-2 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={toggleRecord}
+            disabled={busy}
+            aria-pressed={recording}
+            aria-label={recording ? "Stop recording" : "Record from MIDI controller"}
+            className="jambuddy-record flex-1"
+          >
+            {recording ? "■ STOP" : "● RECORD"}
+          </button>
           <button
             type="button"
             onClick={joinIn}

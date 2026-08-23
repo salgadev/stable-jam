@@ -1,0 +1,156 @@
+/**
+ * Web MIDI capture for Jam Buddy.
+ *
+ * Listens to a connected MIDI input (a controller the user is playing),
+ * records note-on/note-off events with timestamps, and converts them into a
+ * Standard MIDI File (.mid) so the take feeds the existing upload pipeline
+ * (tempo auto-detect + duration + generation).
+ *
+ * Browser-only (Web MIDI API). Keep all MIDI access here, call from the page.
+ */
+
+import { Midi } from "@tonejs/midi";
+
+export interface RecordedNote {
+  /** Absolute time (seconds) from the recording start. */
+  time: number;
+  midi: number;
+  velocity: number;
+  /** GM channel the message arrived on (0-15; 9 = percussion). */
+  channel: number;
+}
+
+export interface MidiRecorder {
+  start(): void;
+  stop(): { notes: RecordedNote[]; durationSec: number };
+  isActive(): boolean;
+  /** Detach the MIDI listener (call when leaving the page / no longer needed). */
+  dispose(): void;
+}
+
+/**
+ * Build a Standard MIDI File byte buffer from recorded notes + a detected BPM.
+ * Single track, tempo meta at t=0, one note-on/note-off pair per event in
+ * PPQ-relative ticks. Reuses @tonejs/midi so we don't hand-roll SMF bytes.
+ */
+export function recordedNotesToMidi(
+  notes: RecordedNote[],
+  bpm: number,
+): Uint8Array {
+  const midi = new Midi();
+  midi.header.setTempo(60_000_000 / bpm);
+  midi.header.timeSignatures = [{ ticks: 0, timeSignature: [4, 4] }];
+
+  // Group by channel: a separate track per GM channel so percussion (9) and
+  // pitched notes don't collide.
+  const channels = [...new Set(notes.map((n) => n.channel))];
+  const byChannel = new Map<number, RecordedNote[]>();
+  for (const ch of channels) byChannel.set(ch, []);
+  for (const n of notes) byChannel.get(n.channel)!.push(n);
+
+  const ppq = 480;
+  for (const [ch, chNotes] of byChannel) {
+    const track = midi.addTrack();
+    track.channel = ch;
+    track.name = `Capture ch${ch}`;
+    for (const n of [...chNotes].sort((a, b) => a.time - b.time)) {
+      const ticks = Math.max(0, Math.round((n.time / 60) * bpm * ppq));
+      const durTicks = Math.max(1, Math.round((0.1 / 60) * bpm * ppq));
+      track.addNote({
+        midi: n.midi,
+        ticks,
+        durationTicks: durTicks,
+        velocity: Math.max(0.01, Math.min(1, n.velocity / 127)),
+      });
+    }
+  }
+  return midi.toArray();
+}
+
+/** Build a .mid File (for the take upload slot). */
+export function recordedNotesAsFile(
+  notes: RecordedNote[],
+  bpm: number,
+): File {
+  const bytes = recordedNotesToMidi(notes, bpm);
+  const ts = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  return new File(
+    [new Uint8Array(bytes)],
+    `jambuddy-live-capture-${ts}.mid`,
+    { type: "audio/midi" },
+  );
+}
+
+/**
+ * Create a recorder bound to a MIDI input. Requests MIDI access (user gesture
+ * required in some browsers). Returns a started recorder + the chosen input.
+ *
+ * If `preferredDeviceName` is given, use that input; otherwise the first
+ * available. Throws if Web MIDI is unsupported or no input is available.
+ */
+export async function createMidiRecorder(
+  preferredDeviceName?: string,
+): Promise<MidiRecorder> {
+  if (typeof navigator === "undefined" || !("requestMIDIAccess" in navigator)) {
+    throw new Error("Web MIDI is not supported in this browser (try Chrome/Edge).");
+  }
+
+  const access = await navigator.requestMIDIAccess();
+  const inputs = [...access.inputs.values()];
+  if (inputs.length === 0) {
+    throw new Error("No MIDI input device found. Connect a controller.");
+  }
+  const input =
+    inputs.find((i) => i.name === preferredDeviceName) ??
+    inputs[0] ??
+    null;
+  if (!input) {
+    throw new Error("No MIDI input device found. Connect a controller.");
+  }
+
+  let active = false;
+  let startTime = 0;
+  const notes: RecordedNote[] = [];
+
+  const onMessage = (e: MIDIMessageEvent) => {
+    if (!active || !e.data) return;
+    const status = e.data[0];
+    const midi = e.data[1];
+    const vel = e.data[2];
+    if (status === undefined || midi === undefined || vel === undefined) return;
+    const cmd = status & 0xf0;
+    const channel = status & 0x0f;
+    if (cmd === 0x90 && vel > 0) {
+      notes.push({
+        time: (performance.now() - startTime) / 1000,
+        midi,
+        velocity: vel,
+        channel,
+      });
+    }
+  };
+  input.addEventListener("midimessage", onMessage);
+
+  return {
+    start() {
+      startTime = performance.now();
+      notes.length = 0;
+      active = true;
+    },
+    stop() {
+      active = false;
+      return {
+        notes: [...notes],
+        durationSec:
+          notes.length > 0
+            ? (performance.now() - startTime) / 1000
+            : 0,
+      };
+    },
+    isActive: () => active,
+    dispose() {
+      active = false;
+      input.removeEventListener("midimessage", onMessage);
+    },
+  };
+}

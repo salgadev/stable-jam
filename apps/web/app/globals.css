@@ -121,18 +121,52 @@
   cursor: wait;
 }
 
-/* Metal rocker switch for the engine (API / Local). A labelled checkbox hidden
- * inside; the visual is a brushed-steel two-position rocker with a center
- * divider and an inset "pressed" face on the active side — the analog
- * hardware toggle look. Keyboard/screenreader usable via the hidden input. */
+/* Big RED record button — a physical record arm with a glowing tip. */
+.jambuddy-record {
+  border-radius: 0.5rem;
+  border: 1px solid #7a1c1c;
+  background: linear-gradient(180deg, #d64545 0%, #a11f1f 55%, #7a1414 100%);
+  color: #ffe9e9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 0.9rem 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.4),
+    0 2px 0 #5c0f0f;
+  position: relative;
+}
+.jambuddy-record:hover {
+  filter: brightness(1.08);
+}
+.jambuddy-record[aria-pressed="true"] {
+  background: linear-gradient(180deg, #e05252 0%, #b52424 55%, #8a1616 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(224, 60, 60, 0.6),
+    0 1px 0 #5c0f0f;
+  transform: translateY(1px);
+}
+.jambuddy-record:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Physical hardware toggle for the engine (API / Local). A labelled checkbox
+ * hidden inside; the visual is a metal slide switch with a chunky lever that
+ * travels between two detent positions (API left, Local right), matching the
+ * hardware-sampler aesthetic. Keyboard/screenreader usable via the input. */
 .engine-toggle {
   position: relative;
   display: inline-flex;
   align-items: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 .engine-toggle input {
   position: absolute;
@@ -140,64 +174,90 @@
   width: 0;
   height: 0;
 }
-.engine-toggle__track {
+/* The switch body — a recessed metal channel with a center detent notch. */
+.engine-toggle__switch {
+  position: relative;
   display: inline-flex;
-  position: relative;
-  border-radius: 9999px;
-  background: linear-gradient(180deg, #c9ced6 0%, #9aa1ac 45%, #6d7480 100%);
-  padding: 3px;
+  align-items: center;
+  width: 6.5rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, #4a4f5a 0%, #2c3038 60%, #1e2127 100%);
+  border: 1px solid #17191e;
   box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.55),
-    0 1px 2px rgba(0, 0, 0, 0.6);
+    inset 0 2px 5px rgba(0, 0, 0, 0.7),
+    0 1px 1px rgba(255, 255, 255, 0.12);
+  padding: 0 0.35rem;
 }
-.engine-toggle__opt {
-  position: relative;
-  padding: 0.32rem 0.85rem;
-  border-radius: 999px;
-  color: #2a2d3d;
+/* Labels pinned to each side of the lever travel. */
+.engine-toggle__label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8b92a0;
   font-weight: 700;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
   z-index: 1;
+  pointer-events: none;
 }
-/* The center divider — a vertical screw/knurl that reads as the switch hinge. */
-.engine-toggle__track::before {
+.engine-toggle__label--api {
+  left: 0.45rem;
+}
+.engine-toggle__label--local {
+  right: 0.3rem;
+}
+/* The chunky metal lever — slides to whichever side is active. */
+.engine-toggle__lever {
+  position: absolute;
+  top: 50%;
+  left: 0.3rem;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(180deg, #f0e9dc 0%, #cfc7b8 40%, #a89f8e 100%);
+  border: 1px solid #6b6352;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.35),
+    0 2px 3px rgba(0, 0, 0, 0.5);
+  transform: translateY(-50%);
+  transition: left 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+/* A grip groove on the lever. */
+.engine-toggle__lever::after {
   content: "";
   position: absolute;
-  left: 50%;
   top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
-  width: 2px;
-  height: 70%;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.35));
-  z-index: 2;
-  border-radius: 1px;
+  width: 1rem;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
-/* Active (checked = API) side pressed-in, inactive side raised. */
-.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--api {
-  background: linear-gradient(180deg, #f4a261, #e07b3a);
-  color: #12131b;
-  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
-  transform: translateY(1px);
+/* Checked (API) -> lever slides left under the API label; active label glows. */
+.engine-toggle input:checked + .engine-toggle__switch .engine-toggle__lever {
+  left: 0.3rem;
 }
-.engine-toggle input:checked + .engine-toggle__track .engine-toggle__opt--local {
-  background: linear-gradient(180deg, #eef0f4, #c9ced8);
-  color: #2a2d3d;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+.engine-toggle input:not(:checked) + .engine-toggle__switch .engine-toggle__lever {
+  left: calc(100% - 2.9rem);
 }
-.engine-toggle input:not(:checked) + .engine-toggle__track .engine-toggle__opt--local {
-  background: linear-gradient(180deg, #5fd38a, #3aa55f);
-  color: #12131b;
-  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
-  transform: translateY(1px);
+.engine-toggle input:checked + .engine-toggle__switch .engine-toggle__label--api {
+  color: #f4a261;
+  text-shadow: 0 0 6px rgba(244, 162, 97, 0.6);
 }
-.engine-toggle input:not(:checked) + .engine-toggle__track .engine-toggle__opt--api {
-  background: linear-gradient(180deg, #eef0f4, #c9ced8);
-  color: #2a2d3d;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+.engine-toggle input:not(:checked) + .engine-toggle__switch .engine-toggle__label--local {
+  color: #5fd38a;
+  text-shadow: 0 0 6px rgba(95, 211, 138, 0.6);
 }
-.engine-toggle input:focus-visible + .engine-toggle__track {
+.engine-toggle input:focus-visible + .engine-toggle__switch {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+.engine-toggle input:disabled + .engine-toggle__switch {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 :root {
   --bg: #ffffff;
