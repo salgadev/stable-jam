@@ -159,11 +159,12 @@ function Pad({
 }
 
 /** Bundled demo takes (Gradio-style clickable examples).
- * Each has a MIDI (loads as a take) and a pre-rendered MP3 (audible preview). */
+ * Each is an MP3 (loads as an audio take so the buddy responds to it) with a
+ * matching BPM (from the source MIDI) that pre-sets the tempo knob. */
 const DEMO_MIDIS = [
-  { name: "tupatutupatututata", label: "Tupatutupatututata (drums)" },
-  { name: "dangerous-bass-line", label: "Dangerous bass line" },
-  { name: "this-riff-does-not-exist", label: "This riff does not exist" },
+  { name: "tupatutupatututata", label: "Tupatutupatututata (drums)", bpm: 158 },
+  { name: "dangerous-bass-line", label: "Dangerous bass line", bpm: 120 },
+  { name: "this-riff-does-not-exist", label: "This riff does not exist", bpm: 160 },
 ];
 
 export default function HomePage() {
@@ -244,18 +245,21 @@ export default function HomePage() {
     a.play().catch(() => setStatus("Couldn't play demo (audio blocked?)."));
   }
 
-  /** Load a bundled demo MIDI (served from /demos) as a take. */
-  async function loadDemo(name: string) {
+  /** Load a bundled demo as an audio take + set the tempo knob to its BPM.
+   * The MP3 is what the buddy responds to (audio-to-audio); the exact tempo
+   * comes from the source MIDI, so we set the knob to it rather than trusting
+   * librosa's estimate of the MP3. */
+  async function loadDemo(name: string, demoBpm: number) {
     setStatus(`Loading demo "${name}"…`);
     try {
-      const res = await fetch(`/demos/${name}.mid`);
-      if (!res.ok) throw new Error(`fetch ${name}.mid -> ${res.status}`);
-      const bytes = await res.arrayBuffer();
-      // A File with the right name/type flows through the exact same path as
-      // an upload (isMidiFile → tempo detect → duration).
-      const file = new File([bytes], `${name}.mid`, { type: "audio/midi" });
+      const res = await fetch(`/demos/${name}.mp3`);
+      if (!res.ok) throw new Error(`fetch ${name}.mp3 -> ${res.status}`);
+      const blob = await res.blob();
+      const file = new File([blob], `${name}.mp3`, { type: "audio/mpeg" });
+      // Load it as an audio take, then pin the knob to the demo's real tempo.
       await handleTakeFile(file);
-      setStatus(`Loaded demo "${name}".`);
+      setBpm(demoBpm);
+      setStatus(`Loaded demo "${name}" @ ${demoBpm} BPM.`);
     } catch (e) {
       setStatus(`Couldn't load demo: ${String(e)}`);
     }
@@ -728,7 +732,7 @@ export default function HomePage() {
               >
                 <button
                   type="button"
-                  onClick={() => loadDemo(d.name)}
+                  onClick={() => loadDemo(d.name, d.bpm)}
                   disabled={busy}
                   className="text-[#e8e8f0] hover:text-[#5fd38a]"
                 >
