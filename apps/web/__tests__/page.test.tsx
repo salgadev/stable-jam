@@ -230,3 +230,40 @@ describe("RECORD source toggle", () => {
     expect(channelOptions.length).toBe(17); // All + 16
   });
 });
+
+describe("Tempo knob", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.stubGlobal("URL.createObjectURL", createObjectURL);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("lets you type a multi-digit tempo (regression: clamped mid-keystroke)", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    const tempoInput = screen.getByRole("spinbutton", { name: "Tempo value" });
+    // Default is 184. Clear and type 158.
+    await user.clear(tempoInput);
+    await user.type(tempoInput, "158");
+    // Blur commits the clamped value.
+    await user.tab();
+
+    // The prompt reflects the committed tempo.
+    expect(tempoInput).toHaveValue(158);
+  });
+
+  it("clamps an out-of-range typed tempo to [min,max] on commit", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+    const tempoInput = screen.getByRole("spinbutton", { name: "Tempo value" });
+    await user.clear(tempoInput);
+    await user.type(tempoInput, "999");
+    await user.tab();
+    expect(tempoInput).toHaveValue(220); // max
+  });
+});
