@@ -12,8 +12,13 @@
  * you can compare the take and the response side by side.
  */
 
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { parseMidi, type ParsedNote } from "./player";
+
+export interface VisualizerHandle {
+  /** Stop any audio this visualizer is playing (used to enforce exclusivity). */
+  stop: () => void;
+}
 
 interface VisualizerProps {
   /** MIDI bytes -> piano-roll. Mutually exclusive with audioUrl. */
@@ -24,6 +29,11 @@ interface VisualizerProps {
   label?: string;
   /** Height of the canvas in px. */
   height?: number;
+  /** Show a play/stop toggle on the waveform (audio only). */
+  playable?: boolean;
+  /** Called right before this visualizer starts playing, so the owner can stop
+   * any other audio source (enforces "one waveform, one playback"). */
+  onStartPlayback?: () => void;
 }
 
 const NOTE_MIN = 21; // A0
@@ -119,77 +129,143 @@ function drawWaveform(
   }
 }
 
-export function Visualizer({
-  midiBytes,
-  audioUrl,
-  label,
-  height = 120,
-}: VisualizerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export const Visualizer = forwardRef<VisualizerHandle, VisualizerProps>(
+  function Visualizer(
+    {
+      midiBytes,
+      audioUrl,
+      label,
+      height = 120,
+      playable = false,
+      onStartPlayback,
+    },
+    ref,
+  ) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Play/stop state for the waveform toggle (audio only).
+    const [playing, setPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    // Expose a stop() so the parent can enforce one-waveform-at-a-time.
+    useImperativeHandle(ref, () => ({
+      stop: () => {
+        audioRef.current?.pause();
+        audioRef.current = null;
+        setPlaying(false);
+      },
+    }));
 
-    if (midiBytes) {
-      let notes: ParsedNote[] = [];
-      let duration = 0;
-      try {
-        notes = parseMidi(midiBytes);
-        duration = notes.reduce(
-          (m, n) => Math.max(m, n.time + n.duration),
-          0,
-        );
-      } catch {
-        /* corrupt bytes -> empty roll */
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      // reset play state whenever the audio changes
+      setPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
-      drawPianoRoll(canvas, notes, duration);
-      return;
-    }
+      if (midiBytes) {
+        let notes: ParsedNote[] = [];
+        let duration = 0;
+        try {
+          notes = parseMidi(midiBytes);
+          duration = notes.reduce(
+            (m, n) => Math.max(m, n.time + n.duration),
+            0,
+          );
+        } catch {
+          /* corrupt bytes -> empty roll */
+        }
+        drawPianoRoll(canvas, notes, duration);
+        return;
+      }
 
-    if (audioUrl) {
-      const ctx = new AudioContext();
-      fetch(audioUrl)
-        .then((r) => r.arrayBuffer())
-        .then((buf) => ctx.decodeAudioData(buf))
-        .then((audio) => {
-          drawWaveform(canvas, audio);
-          ctx.close();
-        })
+      if (audioUrl) {
+        const ctx = new AudioContext();
+        fetch(audioUrl)
+          .then((r) => r.arrayBuffer())
+          .then((buf) => ctx.decodeAudioData(buf))
+          .then((audio) => {
+            drawWaveform(canvas, audio);
+            ctx.close();
+          })
+          .catch(() => {
+            const c = canvas.getContext("2d");
+            if (c) {
+              c.fillStyle = "#12131b";
+              c.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+              c.fillStyle = "#7f829c";
+              c.font = "12px ui-monospace, monospace";
+              c.textAlign = "center";
+              c.fillText("no audio", canvas.clientWidth / 2, canvas.clientHeight / 2);
+            }
+          });
+        return;
+      }
+
+      // Nothing to draw.
+      const c = canvas.getContext("2d");
+      if (c) {
+        c.fillStyle = "#12131b";
+        c.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      }
+    }, [midiBytes, audioUrl]);
+
+    // Toggle play/stop of the waveform's audio (audio only).
+    const togglePlay = () => {
+      if (!audioUrl) return;
+      if (playing) {
+        audioRef.current?.pause();
+        audioRef.current = null;
+        setPlaying(false);
+        return;
+      }
+      // Tell the owner to stop anything else first (one playback at a time).
+      onStartPlayback?.();
+      const a = new Audio(audioUrl);
+      a.onended = () => {
+        audioRef.current = null;
+        setPlaying(false);
+      };
+      audioRef.current = a;
+      a.play()
+        .then(() => setPlaying(true))
         .catch(() => {
-          const c = canvas.getContext("2d");
-          if (c) {
-            c.fillStyle = "#12131b";
-            c.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-            c.fillStyle = "#7f829c";
-            c.font = "12px ui-monospace, monospace";
-            c.textAlign = "center";
-            c.fillText("no audio", canvas.clientWidth / 2, canvas.clientHeight / 2);
-          }
+          audioRef.current = null;
+          setPlaying(false);
         });
-      return;
-    }
+    };
 
-    // Nothing to draw.
-    const c = canvas.getContext("2d");
-    if (c) {
-      c.fillStyle = "#12131b";
-      c.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    }
-  }, [midiBytes, audioUrl]);
-
-  return (
-    <div className="w-full">
-      {label && (
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
-          {label}
+    return (
+      <div className="w-full">
+        {label && (
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+            {label}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          {playable && audioUrl && (
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label={playing ? "Stop playback" : "Play"}
+              title={playing ? "Stop" : "Play"}
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border text-sm ${
+                playing
+                  ? "border-[#e05252] bg-[#e05252] text-[#12131b]"
+                  : "border-[#2a2d3d] bg-[#1a1c28] text-[#5fd38a] hover:bg-[#5fd38a] hover:text-[#12131b]"
+              }`}
+            >
+              {playing ? "■" : "▶"}
+            </button>
+          )}
+          <canvas
+            ref={canvasRef}
+            className="w-full rounded border border-[#2a2d3d] bg-[#12131b]"
+            style={{ height }}
+          />
         </div>
-      )}
-      <canvas
-        ref={canvasRef}
-        className="w-full rounded border border-[#2a2d3d] bg-[#12131b]"
-        style={{ height }}
-      />
-    </div>
-  );
-}
+      </div>
+    );
+  },
+);

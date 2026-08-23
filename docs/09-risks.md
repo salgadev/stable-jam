@@ -312,3 +312,54 @@ Risks ranked by impact × likelihood. Each has an owner, a mitigation, and a con
 - Mobile apps
 - Cloud accounts / user authentication
 - Anything that requires a third-party API key beyond SA3
+
+---
+
+## Current Jam Buddy bugs & findings (verified against Stability API docs)
+
+> These are open/confirmed items tracked for the current work. Docs consulted:
+> `platform.stability.ai/docs/api-reference` → `post /v2beta/audio/stable-audio/audio-to-audio`.
+
+### 1. SA3 `strength` (noise/denoising) is NOT being sent — open bug (high priority)
+
+The SA3 **audio-to-audio** request schema exposes a `strength` parameter (a.k.a.
+*denoising*): **0 = output identical to input, 1 = as if no input was given.**
+We do **not** send it, so it defaults to **1** = full diffusion. This explains:
+- "generations render nothing new" (input take fully morphed / barely anchors output)
+- "output contains more than one instrument" (the take's instrument doesn't anchor,
+  model freely adds others)
+
+Stability's guidance for audio-to-audio is `strength` ≈ **0.5–0.8** (diffuse the
+take but keep it as the anchor). This is the pending **"Noise knob"** task —
+wire `strength` into `tools/jam_buddy_api.py` and expose it in the UI. **UNSENT today.**
+
+### 2. The audio API has NO `negative_prompt` — confirmed
+SA3 audio-to-audio only accepts: `prompt`, `audio`, `model`, `duration`, `seed`,
+`steps`, `cfg_scale`, `output_format`, `strength`. There is **no `negative_prompt`**.
+(Negative prompts exist on Stable *Image*, not Stable Audio.) So we **cannot** steer
+away from extra instruments via a negative prompt — the positive prompt + `cfg_scale`
++ `strength` are the only levers. The local CPU fallback (`small-music`) DOES accept
+a negative prompt.
+
+### 3. Demo examples can't be played — RESOLVED
+The clickable demo chips (Gradio-style) load MIDI as a take, but preview playback
+doesn't work — the MIDI examples need to render to audio to actually be audible
+as a "playable example." Consider pre-rendering the demo MIDIs to audio (or
+ensuring the Web-MIDI synth preview actually plays).
+
+**Resolved:** demos now load their pre-rendered MP3 as an audio take (with the
+BPM knob pinned to the source MIDI's tempo), and playback is a play/stop toggle
+on the waveform. Single-select + instant highlight/knob update.
+
+### 4. Stale `.next` cache corrupts the dev server (recurring) — OPEN
+`next dev`'s incremental cache corrupts after heavy edits. Symptoms: API routes
+500 (`MODULE_NOT_FOUND` in `webpack-runtime.js`) OR the page renders blank
+(every `/_next/static/chunk` 404s while `GET /` still returns 200). Often a
+leftover process squats on port 3000. Fix today: kill the port-3000 PID
+(`netstat -ano | grep :3000`, `taskkill /F /PID`), `rm -rf apps/web/.next`,
+restart `pnpm dev`, verify chunks load (not just `GET /`). **Address later** —
+candidate: a `dev:clean` npm script that clears `.next` before starting, or a
+more robust dev workflow.
+
+
+

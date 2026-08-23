@@ -12,7 +12,7 @@ guitar reference.
 
 Usage:
   .venv/Scripts/python.exe tools/midi_to_audio.py \
-      --midi tools/hextermination_blast.mid \
+      --midi demos/tupatutupatututata.mid \
       --oneshots tools/oneshots \
       --bpm 184 --out drums.wav
   # add --guitar ref.wav to mix drums under the guitar

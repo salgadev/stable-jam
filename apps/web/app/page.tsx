@@ -29,7 +29,7 @@ import {
   type AudioInput,
   type MidiInput,
 } from "@/lib/jambuddy/recorder";
-import { Visualizer } from "@/lib/jambuddy/visualizer";
+import { Visualizer, type VisualizerHandle } from "@/lib/jambuddy/visualizer";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -158,6 +158,15 @@ function Pad({
   );
 }
 
+/** Bundled demo takes (Gradio-style clickable examples).
+ * Each is an MP3 (loads as an audio take so the buddy responds to it) with a
+ * matching BPM (from the source MIDI) that pre-sets the tempo knob. */
+const DEMO_MIDIS = [
+  { name: "tupatutupatututata", label: "Tupatutupatututata (drums)", bpm: 158 },
+  { name: "dangerous-bass-line", label: "Dangerous bass line", bpm: 120 },
+  { name: "this-riff-does-not-exist", label: "This riff does not exist", bpm: 160 },
+];
+
 export default function HomePage() {
   const [instrument, setInstrument] = useState<BuddyInstrument>("bass");
   const [inputInstrument, setInputInstrument] = useState<InputInstrument>("other");
@@ -175,6 +184,10 @@ export default function HomePage() {
   const [usedBpm, setUsedBpm] = useState<number | null>(null);
   const [usedSeconds, setUsedSeconds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // Name of the demo chip currently loaded as the take (for active highlight).
+  const [loadedDemo, setLoadedDemo] = useState<string | null>(null);
+  // Monotonic token so a slow demo fetch can't clobber a newer selection.
+  const demoLoadToken = useRef(0);
   // Generation backend. API (Stable Audio 3.0 Large) is default when the key is
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
@@ -230,8 +243,38 @@ export default function HomePage() {
     );
   }
 
-  /** Handle a single uploaded take (MIDI or audio), auto-detecting the type. */
-  async function handleTakeFile(f: File | null) {
+  /** Load a bundled demo as an audio take + set the tempo knob to its BPM.
+   * The MP3 is what the buddy responds to (audio-to-audio); the exact tempo
+   * comes from the source MIDI, so we set the knob to it rather than trusting
+   * librosa's estimate of the MP3. */
+  async function loadDemo(name: string, demoBpm: number) {
+    // Select immediately (single-select) + pin the knob, so the UI responds
+    // instantly instead of waiting on the slow fetch/detect below.
+    const token = ++demoLoadToken.current;
+    setLoadedDemo(name);
+    setBpm(demoBpm);
+    setStatus(`Loading demo "${name}"…`);
+    try {
+      const res = await fetch(`/demos/${name}.mp3`);
+      if (!res.ok) throw new Error(`fetch ${name}.mp3 -> ${res.status}`);
+      const blob = await res.blob();
+      const file = new File([blob], `${name}.mp3`, { type: "audio/mpeg" });
+      // Ignore a stale load if the user has since picked a different demo.
+      if (token !== demoLoadToken.current) return;
+      // Load it as an audio take; knownBpm skips the slow server detect.
+      await handleTakeFile(file, demoBpm);
+      setStatus(`Loaded demo "${name}" @ ${demoBpm} BPM.`);
+    } catch (e) {
+      if (token === demoLoadToken.current) {
+        setStatus(`Couldn't load demo: ${String(e)}`);
+      }
+    }
+  }
+
+  /** Handle a single uploaded take (MIDI or audio), auto-detecting the type.
+   * `knownBpm` (optional) skips the slow server detect and pins the knob to a
+   * caller-supplied tempo — used by demo chips, which already know their BPM. */
+  async function handleTakeFile(f: File | null, knownBpm?: number) {
     // One upload slot for either kind; picking a new file clears the old take.
     setMidiFile(null);
     setMidiBytes(null);
@@ -256,7 +299,11 @@ export default function HomePage() {
       }
       // Pre-fill the tempo knob from the take's tempo map (Option A: detect
       // first, knob stays authoritative + editable).
-      await prefillTempo(f, "midi");
+      if (knownBpm !== undefined) {
+        setBpm(knownBpm);
+      } else {
+        await prefillTempo(f, "midi");
+      }
       setStatus(
         `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
@@ -266,7 +313,11 @@ export default function HomePage() {
       // Audio is heard by the buddy (audio-to-audio). Clear the MIDI-driven
       // input-instrument default so the user's declaration reflects the audio.
       setInputInstrument("other");
-      await prefillTempo(f, "audio");
+      if (knownBpm !== undefined) {
+        setBpm(knownBpm);
+      } else {
+        await prefillTempo(f, "audio");
+      }
       setStatus(
         `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
@@ -435,7 +486,17 @@ export default function HomePage() {
    * click can read a stale `false` and start a SECOND simultaneous layer. Keep
    * a synchronous ref so the toggle is atomic. */
   const playbackRef = useRef<{ stop: () => void } | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Refs to the take + response visualizers so PLAY TOGETHER / other toggles
+  // can stop their audio (enforces one playback at a time).
+  const takeVisualizerRef = useRef<VisualizerHandle>(null);
+  const responseVisualizerRef = useRef<VisualizerHandle>(null);
+
+  // Central authority: stop every waveform toggle before any new playback
+  // starts, so the same audio never plays in two places at once.
+  const stopAllWaveformPlayback = () => {
+    takeVisualizerRef.current?.stop();
+    responseVisualizerRef.current?.stop();
+  };
   async function playBoth() {
     if (playbackRef.current) {
       // Stop: kill current playback (synchronous — immune to stale state).
@@ -449,8 +510,9 @@ export default function HomePage() {
       setStatus("Generate a response first.");
       return;
     }
-    // Pause the standalone audio element so the response isn't heard twice.
-    audioRef.current?.pause();
+    // Stop any single-waveform playback so the same audio isn't heard twice
+    // while PLAY TOGETHER runs.
+    stopAllWaveformPlayback();
     playbackRef.current = { stop: () => {} }; // claim the toggle synchronously
     setIsPlayingTogether(true);
     setStatus("Playing your take + the buddy together…");
@@ -504,6 +566,9 @@ export default function HomePage() {
         bpm?: number;
         midi?: string;
         audio?: string;
+        /** Real extension of the audio take (e.g. aif, wav, mp3) so the server
+         * names the temp file correctly. */
+        audioExt?: string;
         duration?: number;
         mode: "api" | "local";
       } = { knobs: { instrument, inputInstrument, genre, mood, bpm }, mode };
@@ -520,6 +585,11 @@ export default function HomePage() {
         setStatus("Reading your audio take…");
         const base64 = await fileToBase64(audioFile);
         payload.audio = base64;
+        // Pass the real audio extension so the server names the temp file
+        // correctly (soundfile won't read a .wav-named AIFF/WEBM).
+        const extMatch = audioFile.name.match(/\.(aiff?|wav|mp3|flac|ogg|m4a|webm)$/i);
+        const ext = extMatch?.[1] ?? "wav";
+        payload.audioExt = ext.toLowerCase();
         // Audio-to-audio: the buddy responds to the groove.
         delete payload.bpm;
       }
@@ -676,6 +746,29 @@ export default function HomePage() {
               {audioFile.name} — audio: buddy responds to its groove (audio-to-audio).
             </p>
           )}
+          {/* Gradio-style demo examples: click to load as a take. Playback is
+              on the take waveform (audio) below. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+              Demos
+            </span>
+            {DEMO_MIDIS.map((d) => (
+              <button
+                key={d.name}
+                type="button"
+                onClick={() => loadDemo(d.name, d.bpm)}
+                disabled={busy}
+                aria-pressed={loadedDemo === d.name}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  loadedDemo === d.name
+                    ? "border-[#5fd38a] bg-[#5fd38a]/15 text-[#5fd38a]"
+                    : "border-[#2a2d3d] bg-[#1a1c28] text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Transport */}
@@ -863,16 +956,6 @@ export default function HomePage() {
               Generated in {usedSeconds.toFixed(1)}s
             </p>
           )}
-          {audioUrl && (
-            <audio
-              ref={audioRef}
-              controls
-              src={audioUrl}
-              className="mt-3 w-full"
-            >
-              Your browser does not support audio playback.
-            </audio>
-          )}
         </section>
 
         {/* Take + response visualizers — stacked vertically, DAW-style.
@@ -911,8 +994,11 @@ export default function HomePage() {
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <Visualizer
+                    ref={takeVisualizerRef}
                     audioUrl={takeAudioUrl}
                     label="Your take (audio waveform)"
+                    playable
+                    onStartPlayback={stopAllWaveformPlayback}
                   />
                 </div>
               </div>
@@ -921,8 +1007,11 @@ export default function HomePage() {
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <Visualizer
+                    ref={responseVisualizerRef}
                     audioUrl={audioUrl}
                     label="Buddy response (waveform)"
+                    playable
+                    onStartPlayback={stopAllWaveformPlayback}
                   />
                 </div>
                 <button
