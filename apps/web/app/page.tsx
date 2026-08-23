@@ -504,6 +504,9 @@ export default function HomePage() {
         bpm?: number;
         midi?: string;
         audio?: string;
+        /** Real extension of the audio take (e.g. aif, wav, mp3) so the server
+         * names the temp file correctly. */
+        audioExt?: string;
         duration?: number;
         mode: "api" | "local";
       } = { knobs: { instrument, inputInstrument, genre, mood, bpm }, mode };
@@ -520,6 +523,11 @@ export default function HomePage() {
         setStatus("Reading your audio take…");
         const base64 = await fileToBase64(audioFile);
         payload.audio = base64;
+        // Pass the real audio extension so the server names the temp file
+        // correctly (soundfile won't read a .wav-named AIFF/WEBM).
+        const extMatch = audioFile.name.match(/\.(aiff?|wav|mp3|flac|ogg|m4a|webm)$/i);
+        const ext = extMatch?.[1] ?? "wav";
+        payload.audioExt = ext.toLowerCase();
         // Audio-to-audio: the buddy responds to the groove.
         delete payload.bpm;
       }

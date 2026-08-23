@@ -15,6 +15,8 @@ short_description: You start playing, it joins in — an AI music companion.
 > tempo, in the instrument you pick. Built for the Stability AI Challenge at
 > Music Hackspace Montreal (August 22–23, 2026).
 
+TRY IT NOW AT [Our HuggingFace Space](https://huggingface.co/spaces/salgadev/jam-buddy)
+
 ## What this is
 
 **Jam Buddy** is a call-and-response music practice partner. You start playing,

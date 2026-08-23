@@ -17,6 +17,9 @@ interface JambuddyBody {
   midi?: string;
   /** Base64-encoded audio take (mic/interface/render) for audio-to-audio. */
   audio?: string;
+  /** Real extension of the audio take (aif/wav/mp3/...) — keeps the temp file
+   * name matching its content so soundfile can read it. */
+  audioExt?: string;
   /** Response length in seconds. Default 30 (ignored when a take is provided). */
   duration?: number;
   /** Generation backend: "local" (CPU SA3) or "api" (Stable Audio 3.0 Large, 26 credits/gen). */
@@ -166,7 +169,10 @@ export async function POST(req: NextRequest) {
     } else if (body.audio) {
       // Audio: pass to SA3 via init_audio so it responds to the groove. Tempo
       // is still the knob; the take sets duration + drives audio-to-audio.
-      const audioPath = join(tmpdir(), `jambuddy-take-${Date.now()}.wav`);
+      // Use the real audio extension (AIFF/WAV/MP3/...) so soundfile can read
+      // the temp file — a .wav-named AIFF/WEBM fails "Format not recognised".
+      const ext = body.audioExt?.match(/^[a-z0-9]{1,4}$/) ? body.audioExt : "wav";
+      const audioPath = join(tmpdir(), `jambuddy-take-${Date.now()}.${ext}`);
       await writeFile(audioPath, Buffer.from(body.audio, "base64"));
       args.push("--wav", audioPath);
       args.push("--genre", body.knobs.genre);
