@@ -160,9 +160,9 @@ function Pad({
 
 /** Bundled demo MIDI takes, shown as clickable examples (Gradio-style). */
 const DEMO_MIDIS = [
-  { name: "sacrifice-drums", label: "Sacrifice (drums)" },
+  { name: "tupatutupatututata", label: "Tupatutupatututata (drums)" },
   { name: "demo-bass-line", label: "Demo bass line" },
-  { name: "demo-lead-riff", label: "Demo lead riff" },
+  { name: "this-riff-does-not-exist", label: "This riff does not exist" },
 ];
 
 export default function HomePage() {
