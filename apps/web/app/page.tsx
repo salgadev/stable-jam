@@ -16,7 +16,7 @@ import {
   type BuddyMood,
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
-import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether, playMidi } from "@/lib/jambuddy/player";
+import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether } from "@/lib/jambuddy/player";
 import {
   createMidiRecorder,
   createAudioRecorder,
@@ -158,10 +158,11 @@ function Pad({
   );
 }
 
-/** Bundled demo MIDI takes, shown as clickable examples (Gradio-style). */
+/** Bundled demo takes (Gradio-style clickable examples).
+ * Each has a MIDI (loads as a take) and a pre-rendered MP3 (audible preview). */
 const DEMO_MIDIS = [
   { name: "tupatutupatututata", label: "Tupatutupatututata (drums)" },
-  { name: "demo-bass-line", label: "Demo bass line" },
+  { name: "dangerous-bass-line", label: "Dangerous bass line" },
   { name: "this-riff-does-not-exist", label: "This riff does not exist" },
 ];
 
@@ -237,16 +238,10 @@ export default function HomePage() {
     );
   }
 
-  /** Play a bundled demo MIDI solo through the synth (no buddy). */
-  async function playDemo(name: string) {
-    try {
-      const res = await fetch(`/demos/${name}.mid`);
-      if (!res.ok) throw new Error(`fetch ${name}.mid -> ${res.status}`);
-      const bytes = await res.arrayBuffer();
-      await playMidi(bytes);
-    } catch (e) {
-      setStatus(`Couldn't play demo: ${String(e)}`);
-    }
+  /** Play a bundled demo's pre-rendered MP3 (audible preview). */
+  function playDemo(name: string) {
+    const a = new Audio(`/demos/${name}.mp3`);
+    a.play().catch(() => setStatus("Couldn't play demo (audio blocked?)."));
   }
 
   /** Load a bundled demo MIDI (served from /demos) as a take. */
