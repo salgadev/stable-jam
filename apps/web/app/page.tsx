@@ -184,6 +184,8 @@ export default function HomePage() {
   const [usedBpm, setUsedBpm] = useState<number | null>(null);
   const [usedSeconds, setUsedSeconds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // Name of the demo chip currently loaded as the take (for active highlight).
+  const [loadedDemo, setLoadedDemo] = useState<string | null>(null);
   // Generation backend. API (Stable Audio 3.0 Large) is default when the key is
   // present — fast + better isolation, 26 credits/gen. Local = CPU small model,
   // free, supports the negative prompt, slower.
@@ -253,6 +255,7 @@ export default function HomePage() {
       // Load it as an audio take, then pin the knob to the demo's real tempo.
       await handleTakeFile(file);
       setBpm(demoBpm);
+      setLoadedDemo(name);
       setStatus(`Loaded demo "${name}" @ ${demoBpm} BPM.`);
     } catch (e) {
       setStatus(`Couldn't load demo: ${String(e)}`);
@@ -464,7 +467,6 @@ export default function HomePage() {
    * click can read a stale `false` and start a SECOND simultaneous layer. Keep
    * a synchronous ref so the toggle is atomic. */
   const playbackRef = useRef<{ stop: () => void } | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   async function playBoth() {
     if (playbackRef.current) {
       // Stop: kill current playback (synchronous — immune to stale state).
@@ -478,8 +480,6 @@ export default function HomePage() {
       setStatus("Generate a response first.");
       return;
     }
-    // Pause the standalone audio element so the response isn't heard twice.
-    audioRef.current?.pause();
     playbackRef.current = { stop: () => {} }; // claim the toggle synchronously
     setIsPlayingTogether(true);
     setStatus("Playing your take + the buddy together…");
@@ -725,7 +725,12 @@ export default function HomePage() {
                 type="button"
                 onClick={() => loadDemo(d.name, d.bpm)}
                 disabled={busy}
-                className="rounded-full border border-[#2a2d3d] bg-[#1a1c28] px-3 py-1 text-xs text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
+                aria-pressed={loadedDemo === d.name}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  loadedDemo === d.name
+                    ? "border-[#5fd38a] bg-[#5fd38a]/15 text-[#5fd38a]"
+                    : "border-[#2a2d3d] bg-[#1a1c28] text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
+                }`}
               >
                 {d.label}
               </button>
@@ -918,16 +923,6 @@ export default function HomePage() {
               Generated in {usedSeconds.toFixed(1)}s
             </p>
           )}
-          {audioUrl && (
-            <audio
-              ref={audioRef}
-              controls
-              src={audioUrl}
-              className="mt-3 w-full"
-            >
-              Your browser does not support audio playback.
-            </audio>
-          )}
         </section>
 
         {/* Take + response visualizers — stacked vertically, DAW-style.
@@ -979,6 +974,7 @@ export default function HomePage() {
                   <Visualizer
                     audioUrl={audioUrl}
                     label="Buddy response (waveform)"
+                    playable
                   />
                 </div>
                 <button
