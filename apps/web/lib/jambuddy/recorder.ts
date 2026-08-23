@@ -81,15 +81,35 @@ export function recordedNotesAsFile(
   );
 }
 
+/** A MIDI input port (device) the user can select. */
+export interface MidiInput {
+  id: string;
+  name: string;
+}
+
+/** List connected MIDI input devices (ports). */
+export async function listMidiInputs(): Promise<MidiInput[]> {
+  if (typeof navigator === "undefined" || !("requestMIDIAccess" in navigator)) {
+    return [];
+  }
+  const access = await navigator.requestMIDIAccess();
+  return [...access.inputs.values()].map((i) => ({
+    id: i.id,
+    name: i.name || "MIDI controller",
+  }));
+}
+
 /**
  * Create a recorder bound to a MIDI input. Requests MIDI access (user gesture
  * required in some browsers). Returns a started recorder + the chosen input.
  *
- * If `preferredDeviceName` is given, use that input; otherwise the first
- * available. Throws if Web MIDI is unsupported or no input is available.
+ * `preferredDeviceId` selects the input port (from listMidiInputs). `channel`
+ * (0-15) filters to a single GM channel; `undefined` records all channels.
+ * Falls back to the first available input if the preferred device is gone.
  */
 export async function createMidiRecorder(
-  preferredDeviceName?: string,
+  preferredDeviceId?: string,
+  channel?: number,
 ): Promise<MidiRecorder> {
   if (typeof navigator === "undefined" || !("requestMIDIAccess" in navigator)) {
     throw new Error("Web MIDI is not supported in this browser (try Chrome/Edge).");
@@ -101,7 +121,7 @@ export async function createMidiRecorder(
     throw new Error("No MIDI input device found. Connect a controller.");
   }
   const input =
-    inputs.find((i) => i.name === preferredDeviceName) ??
+    inputs.find((i) => i.id === preferredDeviceId) ??
     inputs[0] ??
     null;
   if (!input) {
@@ -119,13 +139,15 @@ export async function createMidiRecorder(
     const vel = e.data[2];
     if (status === undefined || midi === undefined || vel === undefined) return;
     const cmd = status & 0xf0;
-    const channel = status & 0x0f;
+    const msgChannel = status & 0x0f;
+    // If a channel filter is set, ignore messages on other channels.
+    if (channel !== undefined && msgChannel !== channel) return;
     if (cmd === 0x90 && vel > 0) {
       notes.push({
         time: (performance.now() - startTime) / 1000,
         midi,
         velocity: vel,
-        channel,
+        channel: msgChannel,
       });
     }
   };
@@ -151,6 +173,147 @@ export async function createMidiRecorder(
     dispose() {
       active = false;
       input.removeEventListener("midimessage", onMessage);
+    },
+  };
+}
+
+/**
+ * Audio capture via getUserMedia + MediaRecorder (mic / audio interface).
+ *
+ * Returns a recorder with start/stop; stop() yields the captured audio as a
+ * File (.webm) so it can feed the same take pipeline (tempo detect + duration
+ * + audio-to-audio generation) as an uploaded audio take.
+ *
+ * Browser-only. Requires a mic permission grant (user gesture).
+ */
+export interface AudioRecorder {
+  start(): void;
+  stop(): Promise<{ file: File; durationSec: number }>;
+  isActive(): boolean;
+  dispose(): void;
+}
+
+/** A selectable audio input device. */
+export interface AudioInput {
+  deviceId: string;
+  label: string;
+  /** True when this is the system default input. */
+  isDefault: boolean;
+}
+
+/**
+ * List available audio input devices (mics / interfaces). Must be called AFTER
+ * mic permission is granted (getUserMedia), otherwise labels are blank and the
+ * list is incomplete. The browser exposes a `default` pseudo-device alongside
+ * the real devices — we keep it as its own entry (labelled "Default"), but the
+ * real per-device entries are what the user picks from.
+ */
+export async function listAudioInputs(): Promise<AudioInput[]> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.enumerateDevices
+  ) {
+    return [];
+  }
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const audioInputs = devices.filter((d) => d.kind === "audioinput");
+  return audioInputs.map((d) => ({
+    deviceId: d.deviceId,
+    label: d.label || (d.deviceId === "default" ? "Default microphone" : "Mic"),
+    isDefault: d.deviceId === "default",
+  }));
+}
+
+/**
+ * Grant mic permission (a user gesture) and return the live stream. The caller
+ * stops the tracks if it only wanted permission (to enumerate devices).
+ */
+export async function grantMicPermission(): Promise<MediaStream> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getUserMedia
+  ) {
+    throw new Error("getUserMedia is not supported in this browser.");
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: true });
+}
+
+/**
+ * Create an audio recorder. Requests microphone access (user gesture). Throws
+ * if getUserMedia/MediaRecorder is unsupported or the mic is denied.
+ *
+ * `preferredDeviceId` pins the device to record from (from listAudioInputs).
+ * If it's missing/unplugged we fall back to the system default instead of
+ * failing — a hot-plugged/unplugged device should never brick recording.
+ */
+export async function createAudioRecorder(
+  preferredDeviceId?: string,
+): Promise<AudioRecorder> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getUserMedia ||
+    typeof MediaRecorder === "undefined"
+  ) {
+    throw new Error(
+      "Audio recording is not supported in this browser (need mic + MediaRecorder).",
+    );
+  }
+
+  // Request the preferred device if given; fall back to default on failure.
+  const constraints: MediaStreamConstraints = preferredDeviceId
+    ? { audio: { deviceId: { exact: preferredDeviceId } } }
+    : { audio: true };
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    if (!preferredDeviceId) throw err;
+    // The pinned device is gone — retry with the default mic.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+  const rec = new MediaRecorder(stream);
+  const chunks: BlobPart[] = [];
+  let startTime = 0;
+  let active = false;
+
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
+  };
+
+  return {
+    start() {
+      startTime = performance.now();
+      chunks.length = 0;
+      active = true;
+      rec.start();
+    },
+    stop() {
+      return new Promise((resolve) => {
+        const onStop = () => {
+          active = false;
+          stream.getTracks().forEach((t) => t.stop());
+          const type = rec.mimeType || "audio/webm";
+          const file = new File(
+            chunks,
+            `jambuddy-live-audio-${new Date()
+              .toISOString()
+              .replace(/[-:]/g, "")
+              .replace(/\.\d+Z$/, "Z")}.webm`,
+            { type },
+          );
+          resolve({
+            file,
+            durationSec: (performance.now() - startTime) / 1000,
+          });
+        };
+        rec.addEventListener("stop", onStop, { once: true });
+        rec.stop();
+      });
+    },
+    isActive: () => active,
+    dispose() {
+      active = false;
+      stream.getTracks().forEach((t) => t.stop());
     },
   };
 }

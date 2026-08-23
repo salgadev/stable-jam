@@ -30,6 +30,28 @@ vi.mock("@/lib/jambuddy/recorder", () => ({
     isActive: vi.fn(() => false),
     dispose: vi.fn(),
   })),
+  listMidiInputs: vi.fn(async () => [
+    { id: "mpk", name: "MPK Mini" },
+    { id: "keystation", name: "Keystation 49" },
+  ]),
+  grantMicPermission: vi.fn(async () => ({
+    getTracks: () => [{ stop: vi.fn() }],
+  })),
+  createAudioRecorder: vi.fn(async () => ({
+    start: vi.fn(),
+    stop: vi.fn(async () => ({
+      file: new File([new Uint8Array([1, 2, 3])], "cap.webm", {
+        type: "audio/webm",
+      }),
+      durationSec: 1.5,
+    })),
+    isActive: vi.fn(() => false),
+    dispose: vi.fn(),
+  })),
+  listAudioInputs: vi.fn(async () => [
+    { deviceId: "default", label: "Default microphone", isDefault: true },
+    { deviceId: "usb", label: "USB Audio Interface", isDefault: false },
+  ]),
   recordedNotesAsFile: vi.fn(() => new File([""], "cap.mid")),
 }));
 
@@ -122,5 +144,89 @@ describe("PLAY TOGETHER toggle", () => {
     expect(
       screen.getByRole("button", { name: "PLAY TOGETHER" }),
     ).toBeEnabled();
+  });
+});
+
+describe("RECORD source toggle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.stubGlobal("URL.createObjectURL", createObjectURL);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("defaults to MIDI and switches to audio when the Record toggle flips", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Default source is MIDI.
+    const recBtn = screen.getByRole("button", {
+      name: "Record from MIDI controller",
+    });
+    expect(recBtn).toBeInTheDocument();
+
+    // Flip the Record source toggle. DOM order: Engine toggle first, Record
+    // toggle second. The Record toggle starts unchecked (recordSource='midi').
+    const toggles = screen.getAllByRole("checkbox");
+    expect(toggles.length).toBeGreaterThanOrEqual(2);
+    await user.click(toggles[1]);
+
+    // Now the RECORD button targets audio.
+    const audioBtn = screen.getByRole("button", {
+      name: "Record from microphone",
+    });
+    expect(audioBtn).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Record from MIDI controller" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the audio input device dropdown once audio recording starts", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Flip to audio, then start recording so listAudioInputs populates devices.
+    const toggles = screen.getAllByRole("checkbox");
+    await user.click(toggles[1]);
+    await user.click(screen.getByRole("button", { name: "Record from microphone" }));
+
+    // The device dropdown appears with the two mocked devices.
+    const select = await screen.findByRole("combobox", {
+      name: "Audio input device",
+    });
+    expect(select).toBeInTheDocument();
+    const options = Array.from(select.querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(options).toContain("Default microphone");
+    expect(options).toContain("USB Audio Interface");
+  });
+
+  it("shows the MIDI device + channel dropdowns once MIDI recording starts", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Start MIDI recording so listMidiInputs populates devices (source
+    // defaults to MIDI, so just hit RECORD).
+    await user.click(screen.getByRole("button", { name: "Record from MIDI controller" }));
+
+    // Device dropdown lists the two mocked MIDI controllers.
+    const deviceSelect = await screen.findByRole("combobox", {
+      name: "MIDI input device",
+    });
+    const deviceOptions = Array.from(deviceSelect.querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(deviceOptions).toContain("MPK Mini");
+    expect(deviceOptions).toContain("Keystation 49");
+
+    // Channel dropdown defaults to "All" with 16 selectable channels.
+    const channelSelect = screen.getByRole("combobox", { name: "MIDI channel" });
+    const channelOptions = Array.from(channelSelect.querySelectorAll("option"));
+    expect(channelOptions[0]?.textContent).toBe("All");
+    expect(channelOptions.length).toBe(17); // All + 16
   });
 });
