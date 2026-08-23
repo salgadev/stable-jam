@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildPrompt, MODEL_FOR_INSTRUMENT, type BuddyKnobs } from "@/lib/jambuddy/prompt";
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   // contains tools/jam_buddy.py. Walk up from the Next server cwd until we
   // find it — the cwd differs between `pnpm dev` (apps/web) and a root-level
   // launch, so don't assume a fixed number of levels up. Allow an env override.
-  const exists = (p: string) => require("node:fs").existsSync(p);
+  const exists = (p: string) => existsSync(p);
   let repoRoot: string | null = process.env.JAM_BUDDY_ROOT ?? null;
   if (!repoRoot) {
     let cur = process.cwd();
