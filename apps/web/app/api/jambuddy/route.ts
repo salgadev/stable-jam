@@ -111,12 +111,16 @@ export async function POST(req: NextRequest) {
   );
 
   try {
-    // Build args. A take (MIDI or audio) makes the buddy respond to it; with
-    // neither we use the manual bpm knob + duration. The TS-built prompt and
-    // negative prompt override the Python auto-build so AudioSparx tags
-    // (Genre:/Moods:/Instruments:) actually reach SA3.
+    // Build args. Option A: the knob BPM is authoritative and ALWAYS sent. The
+    // take (if any) sets duration + drives audio-to-audio; it never overrides
+    // the tempo. Detection only pre-fills the knob on the client.
+    const knobBpm = Math.round(
+      Math.max(40, Math.min(240, body.knobs.bpm)),
+    );
 
     const args = [
+      "--bpm",
+      String(knobBpm),
       "--instrument",
       body.knobs.instrument,
       "--prompt",
@@ -131,23 +135,23 @@ export async function POST(req: NextRequest) {
       args.push("--negative-prompt", negativePrompt);
     }
     if (body.midi) {
-      // MIDI: derive tempo + response duration from the take (server mido).
+      // MIDI: the take only provides response DURATION (tempo comes from the
+      // knob). Pass --midi so the adapter reads its length for duration.
       const midiPath = join(tmpdir(), `jambuddy-take-${Date.now()}.mid`);
       await writeFile(midiPath, Buffer.from(body.midi, "base64"));
       args.push("--midi", midiPath);
-      console.log("[jambuddy] MIDI take: tempo+duration from it");
+      console.log(`[jambuddy] MIDI take: duration from it; tempo = knob ${knobBpm}`);
     } else if (body.audio) {
-      // Audio: pass to SA3 via init_audio so it responds to the groove.
+      // Audio: pass to SA3 via init_audio so it responds to the groove. Tempo
+      // is still the knob; the take sets duration + drives audio-to-audio.
       const audioPath = join(tmpdir(), `jambuddy-take-${Date.now()}.wav`);
       await writeFile(audioPath, Buffer.from(body.audio, "base64"));
       args.push("--wav", audioPath);
-      // Forward the genre so the audio-BPM detector uses its tempo prior
-      // (e.g. punk 140-220) instead of the weak "any" default — which is what
-      // made it resolve the drums at 120 instead of 158.
       args.push("--genre", body.knobs.genre);
-      console.log("[jambuddy] audio take: audio-to-audio (responds to groove)");
+      console.log(`[jambuddy] audio take: audio-to-audio; tempo = ${knobBpm}`);
     } else {
-      args.push("--bpm", String(bpm), "--duration", String(duration));
+      // No take: knob BPM + explicit duration.
+      args.push("--duration", String(duration));
     }
 
     const t0 = Date.now();

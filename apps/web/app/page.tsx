@@ -179,18 +179,46 @@ export default function HomePage() {
       } catch {
         setInputInstrument("other");
       }
+      // Pre-fill the tempo knob from the take's tempo map (Option A: detect
+      // first, knob stays authoritative + editable).
+      await prefillTempo(f, "midi");
       setStatus(
-        `Loaded ${f.name}. Tempo + length detected from it; buddy will match its ${midiDuration(bytes).toFixed(1)}s length.`,
+        `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
     } else {
       setAudioFile(f);
       // Audio is heard by the buddy (audio-to-audio). Clear the MIDI-driven
       // input-instrument default so the user's declaration reflects the audio.
       setInputInstrument("other");
+      await prefillTempo(f, "audio");
       setStatus(
-        `Loaded ${f.name}. The buddy will respond to its groove (audio-to-audio).`,
+        `Loaded ${f.name}. Tempo auto-detected (${bpm} BPM); adjust the knob if needed.`,
       );
     }
+  }
+
+  /** Ask the server to detect BPM+duration and pre-fill the tempo knob. */
+  async function prefillTempo(f: File, kind: "midi" | "audio") {
+    try {
+      const base64 = await fileToBase64(f);
+      const res = await fetch("/api/jambuddy/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          kind === "midi" ? { midi: base64 } : { audio: base64, genre },
+        ),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { bpm?: number; duration?: number };
+        if (typeof data.bpm === "number" && data.bpm > 0) {
+          setBpm(Math.round(Math.max(40, Math.min(240, data.bpm))));
+        }
+        return data;
+      }
+    } catch {
+      /* detection is best-effort; knob keeps its current value */
+    }
+    return null;
   }
 
   async function joinIn() {
@@ -328,7 +356,6 @@ export default function HomePage() {
             step={1}
             onChange={setBpm}
             format={(v) => `${v} BPM`}
-            disabled={midiFile !== null || audioFile !== null}
           />
         </section>
 

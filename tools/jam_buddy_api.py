@@ -183,6 +183,8 @@ def main():
     ap.add_argument("--out", default="buddy_response.mp3")
     ap.add_argument("--duration", type=float, default=30.0)
     ap.add_argument("--bpm", type=float, default=None)
+    ap.add_argument("--detect-only", action="store_true",
+                    help="detect BPM + duration and print them, then exit (no generation)")
     ap.add_argument("--steps", type=int, default=8)
     ap.add_argument("--cfg", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=0)
@@ -203,26 +205,48 @@ def main():
               "ignored. Fold complement hints into --prompt instead.")
 
     # 1. Resolve BPM + duration + input audio.
+    # Option A: the route ALWAYS passes the knob's --bpm as authoritative. The
+    # take still sets DURATION (so the response matches its length) and, for
+    # audio, is fed via init_audio so the buddy responds to the groove. BPM
+    # detection only happens in --detect-only mode (to pre-fill the knob).
     init_audio = None
+    if args.detect_only:
+        if args.midi:
+            d = detect_bpm_midi(args.midi)
+            dur = max(6.0, midi_duration(args.midi))
+        elif args.wav:
+            d, _ = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
+            import soundfile as _sf
+            _info = _sf.info(args.wav)
+            dur = max(6.0, float(_info.frames) / _info.samplerate)
+        else:
+            ap.error("--detect-only requires --midi or --wav")
+        print(f"DETECT {round(d)} {dur:.2f}")
+        return
     if args.bpm is not None:
         bpm = args.bpm
-        print(f"Using explicit BPM: {bpm}")
-    elif args.midi:
-        bpm = detect_bpm_midi(args.midi)
+        print(f"Using knob BPM: {bpm}")
+    else:
+        # No --bpm: fall back to detection (CLI use). Web always passes the knob.
+        if args.midi:
+            bpm = detect_bpm_midi(args.midi)
+            print(f"Detected BPM (MIDI): {bpm}")
+        elif args.wav:
+            bpm, _ = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
+            print(f"Detected BPM (audio): {bpm:.1f} (genre={args.genre})")
+        else:
+            ap.error("one of --midi, --wav, or --bpm is required")
+
+    # Duration always comes from the take when present (never from the knob).
+    if args.midi:
         args.duration = max(6.0, midi_duration(args.midi))
-        print(f"Detected BPM (MIDI): {bpm} | duration {args.duration:.1f}s")
+        print(f"  MIDI duration -> response {args.duration:.1f}s")
     elif args.wav:
-        bpm, sr = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
-        print(f"Detected BPM (audio): {bpm:.1f} (genre={args.genre})")
-        # Duration must match the take's actual length (like the MIDI path) so
-        # the response stays in tempo with it. Read the real file length.
         import soundfile as sf
         info = sf.info(args.wav)
         args.duration = max(6.0, float(info.frames) / info.samplerate)
         print(f"  audio length -> response {args.duration:.1f}s")
         init_audio = open(args.wav, "rb")
-    else:
-        ap.error("one of --midi, --wav, or --bpm is required")
 
     # 2. Prompt (AudioSparx vocab, same as the CLI/route).
     if args.prompt:

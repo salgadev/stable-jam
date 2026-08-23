@@ -201,6 +201,8 @@ def main():
     ap.add_argument("--tempo-max", type=float, default=None)
     ap.add_argument("--bpm", type=float, default=None,
                     help="explicit BPM override (skip detection)")
+    ap.add_argument("--detect-only", action="store_true",
+                    help="detect BPM + duration and print them, then exit (no generation)")
     ap.add_argument("--prompt", type=str, default=None,
                     help="full SA3 prompt (overrides --instrument auto-build)")
     ap.add_argument("--negative-prompt", type=str, default=None,
@@ -209,30 +211,47 @@ def main():
                     help="init_noise_level for audio-to-audio (lower = closer to input timing)")
     args = ap.parse_args()
 
-    # 1. Detect BPM (or use explicit override)
+    # 1. Detect BPM (or use explicit override).
+    # Option A: the route ALWAYS passes the knob's --bpm as authoritative. The
+    # take sets duration + init_audio. Detection only happens in --detect-only
+    # mode (to pre-fill the knob).
     init_audio = None
+    if args.detect_only:
+        if args.midi:
+            d = detect_bpm_midi(args.midi)
+            dur = max(1.0, midi_duration(args.midi))
+        elif args.wav:
+            d, _ = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
+            import soundfile as _sf
+            _info = _sf.info(args.wav)
+            dur = max(1.0, float(_info.frames) / _info.samplerate)
+        else:
+            ap.error("--detect-only requires --midi or --wav")
+        print(f"DETECT {round(d)} {dur:.2f}")
+        return
     if args.bpm is not None:
         bpm = args.bpm
-        print(f"Using explicit BPM: {bpm}")
-    elif args.midi:
-        bpm = detect_bpm_midi(args.midi)
-        print(f"Detected BPM (MIDI): {bpm} from {args.midi}")
-        # The response must match the take's length so both stay in tempo
-        # together. The server-side mido reading is authoritative.
+        print(f"Using knob BPM: {bpm}")
+    else:
+        # No --bpm: fall back to detection (CLI use). Web always passes the knob.
+        if args.midi:
+            bpm = detect_bpm_midi(args.midi)
+            print(f"Detected BPM (MIDI): {bpm} from {args.midi}")
+        elif args.wav:
+            bpm, _ = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
+            print(f"Detected BPM (audio): {bpm:.1f} (genre={args.genre})")
+        else:
+            ap.error("one of --midi, --wav, or --bpm is required")
+
+    # Duration always comes from the take when present (never from the knob).
+    if args.midi:
         args.duration = midi_duration(args.midi)
         print(f"  MIDI duration -> response {args.duration:.1f}s")
     elif args.wav:
-        bpm, sr = detect_bpm_audio(args.wav, GENRE_TEMPO[args.genre])
-        print(f"Detected BPM (audio): {bpm:.1f} (genre={args.genre})")
-        # Audio-to-audio: feed the take to SA3 via init_audio so the buddy
-        # actually HEARS the groove and responds rhythmically, not just at the
-        # tempo. Duration matches the take.
         waveform, sr = torchaudio.load(args.wav)
         args.duration = waveform.shape[-1] / sr
         init_audio = (sr, waveform)
         print(f"  audio-to-audio: passing {args.wav} ({args.duration:.1f}s) as init_audio")
-    else:
-        ap.error("one of --midi, --wav, or --bpm is required")
 
     # 2. Generate the response at that BPM
     # AudioSparx vocab: the documented music prefix + Instruments: tag.
