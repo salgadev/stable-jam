@@ -141,6 +141,23 @@ For the demo, "always listening with a push-to-talk toggle" is simpler. Use Spac
 | "Loop preview" | Generates 8-second loop of current pattern |
 | "Tighter snare" | Generates snare variant |
 
+## Visual language — hardware / metallic reference
+
+The rack is styled as a hardware sampler. Source-of-truth visual reference:
+
+- **`toggle-switch.webp`** (repo root) — the metallic toggle-switch aesthetic to
+  match. Classic industrial 2-position toggle:
+  - **Chrome ball knob** on a **hexagonal metal housing** (reads as a polished
+    steel nut), seated in a **brushed-aluminum plate**.
+  - **Blue ON / red OFF** labels (colored inserts in the metal plate).
+  - Depth cues that sell it: specular highlight on the knob, drop shadow of the
+    knob onto the housing, inner shading on the hex recess, soft outer shadow on
+    the plate, clean bold sans-serif labels.
+- The existing engine rocker (`apps/web/app/globals.css` `.engine-toggle`) is the
+  in-app analog — brushed-steel two-position rocker. Keep any new toggle/switch
+  in the same metallic language (ball-on-hex for a literal toggle, brushed steel
+  for a rocker), not flat web styling.
+
 ## Screen layout (visual fallback)
 
 When the user is sighted, the visual layout has these regions:
