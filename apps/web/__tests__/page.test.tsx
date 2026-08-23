@@ -41,6 +41,10 @@ vi.mock("@/lib/jambuddy/recorder", () => ({
     isActive: vi.fn(() => false),
     dispose: vi.fn(),
   })),
+  listAudioInputs: vi.fn(async () => [
+    { deviceId: "default", label: "Default microphone", isDefault: true },
+    { deviceId: "usb", label: "USB Audio Interface", isDefault: false },
+  ]),
   recordedNotesAsFile: vi.fn(() => new File([""], "cap.mid")),
 }));
 
@@ -171,5 +175,26 @@ describe("RECORD source toggle", () => {
     expect(
       screen.queryByRole("button", { name: "Record from MIDI controller" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the audio input device dropdown once audio recording starts", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    // Flip to audio, then start recording so listAudioInputs populates devices.
+    const toggles = screen.getAllByRole("checkbox");
+    await user.click(toggles[1]);
+    await user.click(screen.getByRole("button", { name: "Record from microphone" }));
+
+    // The device dropdown appears with the two mocked devices.
+    const select = await screen.findByRole("combobox", {
+      name: "Audio input device",
+    });
+    expect(select).toBeInTheDocument();
+    const options = Array.from(select.querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(options).toContain("Default microphone");
+    expect(options).toContain("USB Audio Interface");
   });
 });

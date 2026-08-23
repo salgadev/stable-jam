@@ -20,9 +20,11 @@ import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether 
 import {
   createMidiRecorder,
   createAudioRecorder,
+  listAudioInputs,
   recordedNotesAsFile,
   type MidiRecorder,
   type AudioRecorder,
+  type AudioInput,
 } from "@/lib/jambuddy/recorder";
 import { Visualizer } from "@/lib/jambuddy/visualizer";
 
@@ -158,6 +160,9 @@ export default function HomePage() {
   const recRef = useRef<MidiRecorder | AudioRecorder | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordSource, setRecordSource] = useState<"midi" | "audio">("midi");
+  // Audio input devices for the source dropdown (populated once mic is allowed).
+  const [audioInputs, setAudioInputs] = useState<AudioInput[]>([]);
+  const [audioDeviceId, setAudioDeviceId] = useState<string | null>(null);
   // Object URL of the last recorded MIDI take (for save + piano-roll).
   const [recordedMidiUrl, setRecordedMidiUrl] = useState<string | null>(null);
 
@@ -321,7 +326,21 @@ export default function HomePage() {
     } else {
       setStatus("Requesting microphone access…");
       try {
-        const rec = await createAudioRecorder();
+        // Populate the device list on first audio record (labels need a grant).
+        if (audioInputs.length === 0) {
+          listAudioInputs()
+            .then((devices) => {
+              setAudioInputs(devices);
+              const first = devices[0];
+              if (devices.length > 0 && first && !audioDeviceId) {
+                setAudioDeviceId(first.deviceId);
+              }
+            })
+            .catch(() => {
+              /* list is best-effort; default mic still works */
+            });
+        }
+        const rec = await createAudioRecorder(audioDeviceId ?? undefined);
         recRef.current = rec;
         rec.start();
         setRecording(true);
@@ -671,6 +690,25 @@ export default function HomePage() {
               ? "MIDI controller"
               : "Mic / audio interface"}
           </span>
+          {recordSource === "audio" && audioInputs.length > 0 && (
+            <label className="flex items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
+                Input
+              </span>
+              <select
+                value={audioDeviceId ?? ""}
+                onChange={(e) => setAudioDeviceId(e.target.value || null)}
+                aria-label="Audio input device"
+                className="rounded border border-[#2a2d3d] bg-[#12131b] px-2 py-1 text-xs text-[#e8e8f0]"
+              >
+                {audioInputs.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         {/* Transport — sampler/sequencer pads */}
         <div className="mb-2 grid grid-cols-3 gap-4">

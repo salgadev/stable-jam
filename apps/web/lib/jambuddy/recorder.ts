@@ -171,11 +171,50 @@ export interface AudioRecorder {
   dispose(): void;
 }
 
+/** A selectable audio input device. */
+export interface AudioInput {
+  deviceId: string;
+  label: string;
+  /** True when this is the system default input. */
+  isDefault: boolean;
+}
+
+/**
+ * List available audio input devices (mics / interfaces). Returns the actual
+ * deviceId + label for each `audioinput`. Labels are only populated once mic
+ * permission has been granted; before that, devices appear as "Mic …" without
+ * a usable label, so call this after a getUserMedia() grant.
+ */
+export async function listAudioInputs(): Promise<AudioInput[]> {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.enumerateDevices
+  ) {
+    return [];
+  }
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const audioInputs = devices.filter((d) => d.kind === "audioinput");
+  const defaultId =
+    devices.find((d) => d.kind === "audioinput" && d.deviceId === "default")
+      ?.deviceId ?? null;
+  return audioInputs.map((d) => ({
+    deviceId: d.deviceId,
+    label: d.label || "Default microphone",
+    isDefault: defaultId !== null && d.deviceId === defaultId,
+  }));
+}
+
 /**
  * Create an audio recorder. Requests microphone access (user gesture). Throws
  * if getUserMedia/MediaRecorder is unsupported or the mic is denied.
+ *
+ * `preferredDeviceId` pins the device to record from (from listAudioInputs).
+ * If it's missing/unplugged we fall back to the system default instead of
+ * failing — a hot-plugged/unplugged device should never brick recording.
  */
-export async function createAudioRecorder(): Promise<AudioRecorder> {
+export async function createAudioRecorder(
+  preferredDeviceId?: string,
+): Promise<AudioRecorder> {
   if (
     typeof navigator === "undefined" ||
     !navigator.mediaDevices?.getUserMedia ||
@@ -186,7 +225,18 @@ export async function createAudioRecorder(): Promise<AudioRecorder> {
     );
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  // Request the preferred device if given; fall back to default on failure.
+  const constraints: MediaStreamConstraints = preferredDeviceId
+    ? { audio: { deviceId: { exact: preferredDeviceId } } }
+    : { audio: true };
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    if (!preferredDeviceId) throw err;
+    // The pinned device is gone — retry with the default mic.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  }
   const rec = new MediaRecorder(stream);
   const chunks: BlobPart[] = [];
   let startTime = 0;
