@@ -18,6 +18,7 @@ import {
 } from "@/lib/jambuddy/prompt";
 import { parseMidi, isPercussion, midiDuration } from "@/lib/jambuddy/player";
 import { createMidiRecorder, recordedNotesAsFile, type MidiRecorder } from "@/lib/jambuddy/recorder";
+import { Visualizer } from "@/lib/jambuddy/visualizer";
 
 /**
  * Jam Buddy — "you start playing, it joins in."
@@ -146,6 +147,8 @@ export default function HomePage() {
   // so the big RED button reflects it.
   const recRef = useRef<MidiRecorder | null>(null);
   const [recording, setRecording] = useState(false);
+  // Object URL of the last recorded MIDI take (for save + piano-roll).
+  const [recordedMidiUrl, setRecordedMidiUrl] = useState<string | null>(null);
 
   const { prompt, negativePrompt } = buildPrompt({
     instrument,
@@ -263,6 +266,9 @@ export default function HomePage() {
         }
         // Use the current knob BPM (or 120) for the tempo map of the .mid.
         const file = recordedNotesAsFile(notes, bpm || 120);
+        // Keep an object URL so the user can save the .mid and see its roll.
+        if (recordedMidiUrl) URL.revokeObjectURL(recordedMidiUrl);
+        setRecordedMidiUrl(URL.createObjectURL(file));
         setStatus(
           `Captured ${notes.length} notes (${durationSec.toFixed(1)}s). Detecting tempo…`,
         );
@@ -283,6 +289,25 @@ export default function HomePage() {
     } catch (e) {
       setStatus(`MIDI record unavailable: ${String(e)}`);
     }
+  }
+
+  /** Download the last recorded MIDI take as a .mid file. */
+  function saveRecordedMidi() {
+    if (!recordedMidiUrl) {
+      setStatus("Record a take first, then save it.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = recordedMidiUrl;
+    a.download = `jambuddy-live-capture-${new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d+Z$/, "Z")}.mid`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setStatus("Saved your recorded MIDI take.");
   }
 
   async function joinIn() {
@@ -522,6 +547,18 @@ export default function HomePage() {
           </button>
           <button
             type="button"
+            onClick={saveRecordedMidi}
+            disabled={!recordedMidiUrl || busy}
+            className="jambuddy-trigger flex-1"
+            style={{
+              background: "linear-gradient(180deg,#5fd38a 0%,#3aa55f 100%)",
+              boxShadow: "0 2px 0 #256b3f",
+            }}
+          >
+            SAVE MIDI
+          </button>
+          <button
+            type="button"
             onClick={joinIn}
             disabled={busy}
             className="jambuddy-trigger flex-1"
@@ -568,6 +605,23 @@ export default function HomePage() {
             </audio>
           )}
         </section>
+
+        {/* Take + response visualizers */}
+        {(midiBytes || audioUrl) && (
+          <section
+            aria-label="Take and response"
+            className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <Visualizer
+              midiBytes={midiBytes}
+              label="Your take (MIDI piano-roll)"
+            />
+            <Visualizer
+              audioUrl={audioUrl}
+              label="Buddy response (waveform)"
+            />
+          </section>
+        )}
       </div>
     </main>
   );
