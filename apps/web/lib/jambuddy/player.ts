@@ -189,6 +189,54 @@ export function midiTempo(buf: ArrayBuffer): number {
 }
 
 /**
+ * Play a MIDI take SOLO through the synth (no buddy). Used by the demo
+ * examples so a MIDI can be previewed on its own.
+ *
+ * @param midiBytes the MIDI bytes to play
+ * @returns a stop() handle
+ */
+export async function playMidi(
+  midiBytes: ArrayBuffer,
+): Promise<{ stop: () => void; done: Promise<void> }> {
+  const ctx = new AudioContext();
+  await ctx.resume();
+
+  const master = ctx.createGain();
+  master.gain.value = 0.8;
+  master.connect(ctx.destination);
+
+  const notes = parseMidi(midiBytes);
+  const startAt = ctx.currentTime + 0.1;
+  for (const note of notes) {
+    scheduleNote(ctx, note, master, startAt + note.time);
+  }
+  const lastMidiTime = notes.length ? (notes[notes.length - 1]?.time ?? 0) : 0;
+  const end = startAt + lastMidiTime + 1;
+
+  const done = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      try {
+        ctx.close();
+      } catch {
+        /* already closed */
+      }
+      resolve();
+    }, Math.max(0, (end - ctx.currentTime) * 1000) + 200);
+  });
+
+  return {
+    stop: () => {
+      try {
+        ctx.close();
+      } catch {
+        /* ignore */
+      }
+    },
+    done,
+  };
+}
+
+/**
  * Get the total duration (seconds) of a MIDI file — the time of the last note
  * end. This is what the generated response must match so the take and the
  * buddy are the same length and stay in tempo together.

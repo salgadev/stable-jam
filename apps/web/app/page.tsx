@@ -16,7 +16,7 @@ import {
   type BuddyMood,
   type InputInstrument,
 } from "@/lib/jambuddy/prompt";
-import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether } from "@/lib/jambuddy/player";
+import { parseMidi, isPercussion, midiDuration, playTogether, playAudioTogether, playMidi } from "@/lib/jambuddy/player";
 import {
   createMidiRecorder,
   createAudioRecorder,
@@ -161,8 +161,8 @@ function Pad({
 /** Bundled demo MIDI takes, shown as clickable examples (Gradio-style). */
 const DEMO_MIDIS = [
   { name: "sacrifice-drums", label: "Sacrifice (drums)" },
-  { name: "halftime-opening", label: "Half-time opening" },
-  { name: "hextermination-blast", label: "Hextermination blast" },
+  { name: "demo-bass-line", label: "Demo bass line" },
+  { name: "demo-lead-riff", label: "Demo lead riff" },
 ];
 
 export default function HomePage() {
@@ -235,6 +235,18 @@ export default function HomePage() {
       f.type === "audio/midi" ||
       f.type === "audio/x-midi"
     );
+  }
+
+  /** Play a bundled demo MIDI solo through the synth (no buddy). */
+  async function playDemo(name: string) {
+    try {
+      const res = await fetch(`/demos/${name}.mid`);
+      if (!res.ok) throw new Error(`fetch ${name}.mid -> ${res.status}`);
+      const bytes = await res.arrayBuffer();
+      await playMidi(bytes);
+    } catch (e) {
+      setStatus(`Couldn't play demo: ${String(e)}`);
+    }
   }
 
   /** Load a bundled demo MIDI (served from /demos) as a take. */
@@ -708,21 +720,36 @@ export default function HomePage() {
               {audioFile.name} — audio: buddy responds to its groove (audio-to-audio).
             </p>
           )}
-          {/* Gradio-style demo examples: click to load the demo MIDI as a take. */}
+          {/* Gradio-style demo examples: click the name to load as a take, or
+              hit the ▶ to preview it solo through the synth. */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#7f829c]">
               Demos
             </span>
             {DEMO_MIDIS.map((d) => (
-              <button
+              <div
                 key={d.name}
-                type="button"
-                onClick={() => loadDemo(d.name)}
-                disabled={busy}
-                className="rounded-full border border-[#2a2d3d] bg-[#1a1c28] px-3 py-1 text-xs text-[#e8e8f0] hover:border-[#5fd38a] hover:text-[#5fd38a]"
+                className="flex items-center gap-1 rounded-full border border-[#2a2d3d] bg-[#1a1c28] py-1 pl-3 pr-1 text-xs"
               >
-                {d.label}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => loadDemo(d.name)}
+                  disabled={busy}
+                  className="text-[#e8e8f0] hover:text-[#5fd38a]"
+                >
+                  {d.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playDemo(d.name)}
+                  disabled={busy}
+                  aria-label={`Play demo ${d.label}`}
+                  title="Preview"
+                  className="grid h-5 w-5 place-items-center rounded-full border border-[#2a2d3d] text-[10px] text-[#5fd38a] hover:bg-[#5fd38a] hover:text-[#12131b]"
+                >
+                  ▶
+                </button>
+              </div>
             ))}
           </div>
         </section>
